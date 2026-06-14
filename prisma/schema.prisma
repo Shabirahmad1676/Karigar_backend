@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  TECHNICIAN
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum JobStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+}
+
+
+model Service {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+}
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(CLIENT)
+
+  jobs      Job[]    @relation("ClientJobs")
+  bids      Bid[]    @relation("TechnicianBids")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String
+  budget      Int
+  status      JobStatus  @default(PENDING)
+
+  clientId    Int
+  client      User       @relation("ClientJobs", fields: [clientId], references: [id])
+
+  bids        Bid[]
+
+  createdAt   DateTime   @default(now())
+}
+
+model Bid {
+  id           Int        @id @default(autoincrement())
+  amount       Int
+  status       BidStatus  @default(PENDING)
+
+  jobId        Int
+  job          Job        @relation(fields: [jobId], references: [id])
+
+  technicianId Int
+  technician   User       @relation("TechnicianBids", fields: [technicianId], references: [id])
+
+  createdAt    DateTime   @default(now())
+}
