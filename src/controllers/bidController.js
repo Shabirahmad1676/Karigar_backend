@@ -39,3 +39,115 @@ export const createBid = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+
+
+
+export const acceptBid = async (req, res) => {
+  try {
+    const jobId = Number(req.params.jobId);
+    const bidId = Number(req.params.bidId);
+
+    if (req.user.role !== "CLIENT") {
+  return res.status(403).json({
+    message: "Only clients can accept bids",
+  });
+}
+
+    // Find job
+    const job = await prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+    });
+
+    if (!job) {
+      return res.status(404).json({
+        message: "Job not found",
+      });
+    }
+
+    // Ensure owner
+    if (job.clientId !== req.user.id) {
+      return res.status(403).json({
+        message: "You are not allowed to accept bids for this job",
+      });
+    }
+
+    // Find bid
+    const bid = await prisma.bid.findUnique({
+      where: {
+        id: bidId,
+      },
+    });
+
+    if (!bid) {
+      return res.status(404).json({
+        message: "Bid not found",
+      });
+    }
+
+    // Ensure bid belongs to this job
+    if (bid.jobId !== jobId) {
+      return res.status(400).json({
+        message: "Bid does not belong to this job",
+      });
+    }
+
+       if (job.status !== "PENDING") {
+  return res.status(400).json({
+    message: "Job has already been processed",
+  });
+}
+
+    // Transaction
+    await prisma.$transaction(async (tx) => {
+
+      // Accept selected bid
+      await tx.bid.update({
+        where: {
+          id: bidId,
+        },
+        data: {
+          status: "ACCEPTED",
+        },
+      });
+
+      // Reject all other bids
+      await tx.bid.updateMany({
+        where: {
+          jobId,
+          id: {
+            not: bidId,
+          },
+        },
+        data: {
+          status: "REJECTED",
+        },
+      });
+
+      // Update job status
+      await tx.job.update({
+        where: {
+          id: jobId,
+        },
+        data: {
+          status: "ACCEPTED",
+        },
+      });
+    });
+
+ 
+
+    return res.status(200).json({
+      message: "Bid accepted successfully",
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};

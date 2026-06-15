@@ -3,7 +3,8 @@ import { getJobs, createJob } from "../controllers/jobController.js";
 import { createBid } from "../controllers/bidController.js";
 import { validateJobRequest, validateBidRequest } from "../middleware/validate.js";
 import { authenticateToken } from "../middleware/authenticateToken.js";
-
+import { acceptBid } from "../controllers/bidController.js";
+import { authorizeRole } from "../middleware/authorizeRole.js";
 
 const router = express.Router();
 
@@ -13,5 +14,12 @@ router.post("/", authenticateToken ,validateJobRequest, createJob);
 
 // Nested Bid Management Endpoint
 router.post("/:jobId/bids", authenticateToken, validateBidRequest, createBid);
+
+router.patch(
+  "/:jobId/bids/:bidId/accept",
+  authenticateToken,
+  authorizeRole("CLIENT"),
+  acceptBid
+);
 
 export default router;
