@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma.js";
-
+import { getIO } from "../socket/socket.js";
 
 export const createBid = async (req, res) => {
   try {
@@ -39,8 +39,6 @@ export const createBid = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
-
 
 
 export const acceptBid = async (req, res) => {
@@ -137,11 +135,17 @@ export const acceptBid = async (req, res) => {
       });
     });
 
- 
-
     return res.status(200).json({
       message: "Bid accepted successfully",
     });
+
+    const io = getIO();
+
+io.emit("bid_accepted", {
+  jobId,
+  bidId,
+  technicianId: bid.technicianId,
+});
 
   } catch (error) {
     console.error(error);

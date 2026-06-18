@@ -1,8 +1,9 @@
 import prisma from "../lib/prisma.js";
+import { getIO } from "../socket/socket.js";
 
-// @desc    Get all jobs with nested client and bid details
-// @route   GET /api/jobs
-export const getJobs = async (req, res) => {
+
+
+export const getJobs = async (req, res,next) => {
   try {
     const jobs = await prisma.job.findMany({
       include: {
@@ -21,7 +22,7 @@ export const getJobs = async (req, res) => {
     });
     res.json(jobs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
@@ -48,6 +49,10 @@ export const createJob = async (req, res) => {
     const job = await prisma.job.create({
       data: { title, description, budget, clientId:req.user.id },
     });
+
+    const io = getIO();
+
+io.emit("new_job_available", job);
 
     res.status(201).json(job);
   } catch (err) {
