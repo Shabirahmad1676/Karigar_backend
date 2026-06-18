@@ -10,6 +10,8 @@ dotenv.config(); // Load environment variables from .env file
 import { initializeSocket } from "./src/socket/socket.js";
 import {errorHandler} from "./src/middleware/errorHandler.js";
 import serviceRoutes from "./src/routes/serviceRoutes.js";
+import redisClient from "./src/config/redis.js";
+import { connectDB } from "./src/config/connectDB.js";
 
 const app = express();
 app.use(express.json());
@@ -58,8 +60,32 @@ app.use("/api/services", serviceRoutes);
 
 app.use(errorHandler); // Global error handling middleware
 
+try {
+    if (!redisClient.isReady) {
+        await redisClient.connect();
+    }
+} catch (redisError) {
+    console.error("Failed to connect to Redis on startup:", redisError);
+}
+
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+  } catch (error) {
+    console.error(
+      "Failed to start application:",
+      error.message
+    );
+
+    process.exit(1);
+  }
+};
+
+startServer();
