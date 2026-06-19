@@ -1,76 +1,39 @@
-import prisma from "../lib/prisma.js";
-import { getIO } from "../socket/socket.js";
-import redisClient from "../config/redis.js";
+// src/controllers/jobController.js
+import { jobService } from "../services/jobService.js";
 
-export const getJobs = async (req, res, next) => {
+export const createJob = async (req, res, next) => {
   try {
-    const CACHE_KEY = "jobs:pending";
-    const cachedJobs = await redisClient.get(CACHE_KEY);
-    if (cachedJobs) {
-      console.log("Serving jobs from cache");
-      return res.json(JSON.parse(cachedJobs));
+    if (req.user.role !== "CLIENT") {
+      return res.status(403).json({ message: "Only clients can post jobs" });
     }
-
-    console.log("Cache miss, fetching jobs from database");
-
-    const jobs = await prisma.job.findMany({
-      include: {
-        client: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        bids: {
-          include: {
-            technician: {
-              select: { id: true, name: true, email: true, role: true },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    await redisClient.set(CACHE_KEY, JSON.stringify(jobs), {
-      EX: 300, // 5 minutes
-    });
-
-    res.json(jobs);
+    const job = await jobService.createJob(req.user.id, req.body);
+    return res.status(201).json(job);
   } catch (err) {
     next(err);
   }
 };
 
-// @desc    Create a new job posting
-// @route   POST /api/jobs
-export const createJob = async (req, res) => {
+export const getMyJobs = async (req, res, next) => {
   try {
-    if (req.user.role !== "CLIENT") {
-      return res.status(403).json({
-        message: "Only clients can create jobs",
-      });
-    }
-
-    const { title, description, budget, clientId } = req.body;
-
-    // Verify user exists and is a CLIENT
-    const user = await prisma.user.findUnique({ where: { id: clientId } });
-    if (!user || user.role !== "CLIENT") {
-      return res
-        .status(403)
-        .json({ error: "Only accounts registered as CLIENT can post jobs" });
-    }
-
-    const job = await prisma.job.create({
-      data: { title, description, budget, clientId: req.user.id },
-    });
-
-    const io = getIO();
-
-    io.emit("new_job_available", job);
-
-    await redisClient.del("jobs:pending");
-
-    res.status(201).json(job);
+    const jobs = await jobService.getClientJobs(req.user.id);
+    return res.status(200).json(jobs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
+  }
+};
+
+export const getJobById = async (req, res, next) => {
+  try {
+    const job = await jobService.getJobById(req.params.id);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // Enforce target access restriction (Owner or Admin authorization checks)
+    if (job.clientId !== req.user.id && req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Access denied to this job profile" });
+    }
+
+    return res.status(200).json(job);
+  } catch (err) {
+    next(err);
   }
 };

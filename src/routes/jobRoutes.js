@@ -1,25 +1,21 @@
 import express from "express";
-import { getJobs, createJob } from "../controllers/jobController.js";
-import { createBid } from "../controllers/bidController.js";
-import { validateJobRequest, validateBidRequest } from "../middleware/validate.js";
-import { authenticateToken } from "../middleware/authenticateToken.js";
-import { acceptBid } from "../controllers/bidController.js";
-import { authorizeRole } from "../middleware/authorizeRole.js";
+import { createJob, getMyJobs, getJobById } from "../controllers/jobController.js";
+import { uploadJobImage } from "../controllers/jobImageController.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { validateJobRequest } from "../middleware/validate.js"; // 1. Import Validator
+import { upload } from "../config/multer.js";
 
 const router = express.Router();
 
-// Job Management Endpoints
-router.get("/", authenticateToken, getJobs);
-router.post("/", authenticateToken ,validateJobRequest, createJob);
+router.use(authMiddleware);
 
-// Nested Bid Management Endpoint
-router.post("/:jobId/bids", authenticateToken, validateBidRequest, createBid);
+// 2. Inject validateJobRequest to sanitize parameters before database execution
+router.post("/", validateJobRequest, createJob);
 
-router.patch(
-  "/:jobId/bids/:bidId/accept",
-  authenticateToken,
-  authorizeRole("CLIENT"),
-  acceptBid
-);
+router.get("/my", getMyJobs);
+router.get("/:id", getJobById);
+
+// Prompt 5 Endpoint
+router.post("/:id/image", upload.single("image"), uploadJobImage);
 
 export default router;

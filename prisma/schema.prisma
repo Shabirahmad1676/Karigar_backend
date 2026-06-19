@@ -7,68 +7,109 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Enums required by Prompt 2
 enum Role {
   CLIENT
-  TECHNICIAN
+  ADMIN
 }
 
-enum BidStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
+enum PriceType {
+  FIXED
+  CUSTOM
 }
 
 enum JobStatus {
   PENDING
-  ACCEPTED
+  POSTED
+  MATCHED
+  COMPLETED
+  CANCELLED
+}
+
+enum JobMatchStatus {
+  PENDING
+  COMMISSION_PAID
+  CONTACT_SHARED
   COMPLETED
 }
 
-
-model Service {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-}
+// User Model Configuration
 model User {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
   name      String
+  email     String   @unique
+  phone     String
   password  String
   role      Role     @default(CLIENT)
-
   jobs      Job[]    @relation("ClientJobs")
-  bids      Bid[]    @relation("TechnicianBids")
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+// Service Model Configuration
+model Service {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  category  String
+  priceType PriceType @default(CUSTOM)
+  isActive  Boolean   @default(true)
+  jobs      Job[]     @relation("ServiceJobs")
+}
+
+// Job Model Configuration with Requested Indexes
 model Job {
   id          Int        @id @default(autoincrement())
   title       String
   description String
   budget      Int
   status      JobStatus  @default(PENDING)
+  latitude    Float?
+  longitude   Float?
+  address     String?
+  imageUrl    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   clientId    Int
   client      User       @relation("ClientJobs", fields: [clientId], references: [id])
 
-  bids        Bid[]
+  serviceId   Int
+  service     Service    @relation("ServiceJobs", fields: [serviceId], references: [id])
+  
+  matches     JobMatch[]
 
-  createdAt   DateTime   @default(now())
+  @@index([status])
+  @@index([clientId])
 }
 
-model Bid {
-  id           Int        @id @default(autoincrement())
-  amount       Int
-  status       BidStatus  @default(PENDING)
+// Technician Model Configuration
+model Technician {
+  id                Int        @id @default(autoincrement())
+  name              String
+  phone             String     @unique
+  cnicImageUrl      String?
+  skillCategory     String
+  city              String
+  whatsappGroupName String?
+  isVerified        Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  
+  matches           JobMatch[]
+}
 
-  jobId        Int
-  job          Job        @relation(fields: [jobId], references: [id])
+// JobMatch Model Configuration
+model JobMatch {
+  id               Int            @id @default(autoincrement())
+  commissionAmount Float
+  commissionPaid   Boolean        @default(false)
+  contactSharedAt  DateTime?
+  status           JobMatchStatus @default(PENDING)
+  createdAt        DateTime       @default(now())
 
-  technicianId Int
-  technician   User       @relation("TechnicianBids", fields: [technicianId], references: [id])
+  jobId            Int
+  job              Job            @relation(fields: [jobId], references: [id])
 
-  createdAt    DateTime   @default(now())
+  technicianId     Int
+  technician       Technician     @relation(fields: [technicianId], references: [id])
 }
