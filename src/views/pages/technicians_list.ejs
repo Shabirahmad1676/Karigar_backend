@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head><title>Technician Deployment Registry</title></head>
+<body style="font-family: Arial, sans-serif; margin: 0; display: flex;">
+  <%- include('../partials/sidebar') %>
+  <div style="flex: 1; display: flex; flex-direction: column; background: #f9fafc;">
+    <%- include('../partials/header') %>
+    <div style="padding: 30px; display: grid; grid-template-columns: 1fr 2fr; gap: 30px;">
+      
+      <div style="background: white; padding: 20px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <h3 style="margin-top:0;">Register New Professional</h3>
+        <form action="/admin/technicians" method="POST">
+          <div style="margin-bottom: 12px;">
+            <label style="display:block; font-size:14px;">Full Name</label>
+            <input type="text" name="name" required style="width:100%; padding:8px; margin-top:4px;">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display:block; font-size:14px;">Phone Line</label>
+            <input type="text" name="phone" required style="width:100%; padding:8px; margin-top:4px;">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display:block; font-size:14px;">Skill Core Classification</label>
+            <input type="text" name="skillCategory" placeholder="e.g. Electrician, Plumber" required style="width:100%; padding:8px; margin-top:4px;">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display:block; font-size:14px;">Operational City</label>
+            <input type="text" name="city" placeholder="e.g. Mardan, Lahore" required style="width:100%; padding:8px; margin-top:4px;">
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label style="display:block; font-size:14px;">WhatsApp Communication Target Group</label>
+            <input type="text" name="whatsappGroupName" style="width:100%; padding:8px; margin-top:4px;">
+          </div>
+          <button type="submit" style="width:100%; background:#1abc9c; color:white; border:none; padding:10px; font-weight:bold; cursor:pointer;">Commit to Database File</button>
+        </form>
+      </div>
+
+      <div style="background: white; padding: 20px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <h3 style="margin-top:0;">Operational Fleet Directory</h3>
+        
+        <form method="GET" action="/admin/technicians" style="display:flex; gap:15px; margin-bottom:20px; padding:10px; background:#f8f9fa;">
+          <div>
+            <label style="font-size:12px; display:block;">City Filter</label>
+            <input type="text" name="city" value="<%= currentCity %>" placeholder="All Cities" style="padding:6px;">
+          </div>
+          <div>
+            <label style="font-size:12px; display:block;">Skill Sort</label>
+            <input type="text" name="skillCategory" value="<%= currentSkill %>" placeholder="All Skills" style="padding:6px;">
+          </div>
+          <button type="submit" style="align-self:flex-end; padding:7px 15px; background:#34495e; color:white; border:none; cursor:pointer;">Execute Query</button>
+        </form>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #f2f4f4; text-align: left; border-bottom: 1px solid #ccc;">
+              <th style="padding: 10px;">ID</th>
+              <th style="padding: 10px;">Name</th>
+              <th style="padding: 10px;">Skill</th>
+              <th style="padding: 10px;">City</th>
+              <th style="padding: 10px;">WhatsApp Group</th>
+              <th style="padding: 10px;">Verified</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% technicians.forEach(t => { %>
+              <tr style="border-bottom: 1px solid #f2f2f2;">
+                <td style="padding: 10px;">#<%= t.id %></td>
+                <td style="padding: 10px;"><strong><%= t.name %></strong><br/><small style="color:#7f8c8d;"><%= t.phone %></small></td>
+                <td style="padding: 10px;"><%= t.skillCategory %></td>
+                <td style="padding: 10px;"><%= t.city %></td>
+                <td style="padding: 10px;"><%= t.whatsappGroupName || 'None Linked' %></td>
+                <td style="padding: 10px;">
+                  <form action="/admin/technicians/<%= t.id %>/edit" method="POST">
+                    <input type="hidden" name="name" value="<%= t.name %>">
+                    <input type="hidden" name="phone" value="<%= t.phone %>">
+                    <input type="hidden" name="skillCategory" value="<%= t.skillCategory %>">
+                    <input type="hidden" name="city" value="<%= t.city %>">
+                    <input type="hidden" name="whatsappGroupName" value="<%= t.whatsappGroupName %>">
+                    <select name="isVerified" onchange="this.form.submit()" style="padding:2px; font-size:12px;">
+                      <option value="false" <%= !t.isVerified ? 'selected' : '' %>>❌ Unverified</option>
+                      <option value="true" <%= t.isVerified ? 'selected' : '' %>>✅ Verified</option>
+                    </select>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

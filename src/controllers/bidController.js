@@ -34,6 +34,12 @@ export const createBid = async (req, res) => {
       },
     });
 
+    // Notify the job owner (client) about the new bid
+    const io = getIO();
+    if (job.clientId) {
+      io.to(`user_${job.clientId}`).emit("new_bid", { jobId, bid });
+    }
+
     return res.status(201).json(bid);
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -135,17 +141,21 @@ export const acceptBid = async (req, res) => {
       });
     });
 
+    // After successful transaction, fetch the accepted bid to get technicianId
+    const acceptedBid = await prisma.bid.findUnique({ where: { id: bidId } });
+
+    const io = getIO();
+    if (acceptedBid && acceptedBid.technicianId) {
+      io.to(`user_${acceptedBid.technicianId}`).emit("bid_accepted", {
+        jobId,
+        bidId,
+        technicianId: acceptedBid.technicianId,
+      });
+    }
+
     return res.status(200).json({
       message: "Bid accepted successfully",
     });
-
-    const io = getIO();
-
-io.emit("bid_accepted", {
-  jobId,
-  bidId,
-  technicianId: bid.technicianId,
-});
 
   } catch (error) {
     console.error(error);
