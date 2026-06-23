@@ -2,12 +2,13 @@ import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
 import { generateToken } from "../utils/generateToken.js";
 
+
 export const register = async (req, res) => {
   try {
-    const { name, email, phone, password, role } = req.body;
-
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({ message: "All fields are required" });
+    const { name, email, phone, password, role, skillCategory, city } = req.body;
+    
+    if (!name || !email || !phone || !password || !role) {
+      return res.status(400).json({ message: "All core fields are required" });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -17,20 +18,36 @@ export const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone,
-        password: hashedPassword,
-        role: role === "ADMIN" ? "ADMIN" : "CLIENT", // Restricts unauthorized roles
-      },
+    // Dynamic relational execution block
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          phone,
+          password: hashedPassword,
+          role: role === "TECHNICIAN" ? "TECHNICIAN" : "CLIENT",
+        },
+      });
+
+      // If signing up as an on-demand specialist, spawn their fleet profile automatically
+      if (role === "TECHNICIAN") {
+        await tx.technician.create({
+          data: {
+            id: newUser.id, // Keep IDs identical or relate them via a Foreign Key row depending on schema
+            name,
+            phone,
+            skillCategory: skillCategory || "General Maintenance",
+            city: city || "Mardan",
+          }
+        });
+      }
+      return newUser;
     });
 
     const token = generateToken(user);
-
     return res.status(201).json({
-      message: "User created successfully",
+      message: "Profile created successfully",
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });

@@ -1,12 +1,23 @@
 import prisma from "../lib/prisma.js";
 
 export const jobService = {
+  // Returns main categories alongside their children nested arrays
   async listActiveServices() {
-    return prisma.service.findMany({ where: { isActive: true } });
+    return prisma.category.findMany({
+      where: { isActive: true },
+      include: {
+        services: {
+          where: { isActive: true }
+        }
+      }
+    });
   },
 
   async getServiceById(id) {
-    return prisma.service.findUnique({ where: { id: parseInt(id) } });
+    return prisma.service.findUnique({
+      where: { id: parseInt(id) },
+      include: { category: true } // Joins category parent context data automatically
+    });
   },
 
   async createJob(clientId, jobData) {
@@ -29,7 +40,11 @@ export const jobService = {
   async getClientJobs(clientId) {
     return prisma.job.findMany({
       where: { clientId },
-      include: { service: true },
+      include: { 
+        service: {
+          include: { category: true } // Deep join schema queries
+        } 
+      },
       orderBy: { createdAt: "desc" },
     });
   },
@@ -37,7 +52,12 @@ export const jobService = {
   async getJobById(id) {
     return prisma.job.findUnique({
       where: { id: parseInt(id) },
-      include: { service: true, client: { select: { id: true, name: true, email: true } } },
+      include: { 
+        service: {
+          include: { category: true }
+        }, 
+        client: { select: { id: true, name: true, email: true } } 
+      },
     });
   },
 };

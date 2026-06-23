@@ -53,6 +53,11 @@ app.use("/api/jobs", jobRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/admin", adminRoutes);
 
+// health api
+app.get("/api/health", (req, res) => {
+  res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
 // 5. Global Exception Interceptor
 app.use(errorHandler);
 
