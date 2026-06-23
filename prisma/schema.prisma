@@ -1,16 +1,16 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// Enums required by Prompt 2
+generator client {
+  provider = "prisma-client-js"
+}
+
 enum Role {
   CLIENT
   ADMIN
+  TECHNICIAN
 }
 
 enum PriceType {
@@ -33,7 +33,6 @@ enum JobMatchStatus {
   COMPLETED
 }
 
-// User Model Configuration
 model User {
   id        Int      @id @default(autoincrement())
   name      String
@@ -46,17 +45,28 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-// Service Model Configuration
-model Service {
+// 1. ADD NEW MAIN CATEGORY MODEL WITH ICON META MAP ROLES
+model Category {
   id        Int       @id @default(autoincrement())
-  name      String    @unique
-  category  String
-  priceType PriceType @default(CUSTOM)
+  name      String    @unique // e.g., "Plumbing & Piping"
+  iconName  String            // e.g., "water-outline" for your Ionicons engine
   isActive  Boolean   @default(true)
-  jobs      Job[]     @relation("ServiceJobs")
+  services  Service[] @relation("CategoryToServices")
 }
 
-// Job Model Configuration with Requested Indexes
+// 2. REFRACTOR SERVICE TO ENFORCE STRICT RELATIONAL NORMALIZATION
+model Service {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique // e.g., "Fixing Leaky Faucets"
+  description String?           // Comprehensive scope baseline
+  priceType   PriceType @default(CUSTOM)
+  isActive    Boolean   @default(true)
+  jobs        Job[]     @relation("ServiceJobs")
+
+  categoryId  Int
+  category    Category  @relation("CategoryToServices", fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
 model Job {
   id          Int        @id @default(autoincrement())
   title       String
@@ -82,7 +92,6 @@ model Job {
   @@index([clientId])
 }
 
-// Technician Model Configuration
 model Technician {
   id                Int        @id @default(autoincrement())
   name              String
@@ -98,7 +107,6 @@ model Technician {
   matches           JobMatch[]
 }
 
-// JobMatch Model Configuration
 model JobMatch {
   id               Int            @id @default(autoincrement())
   commissionAmount Float
