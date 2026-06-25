@@ -1,7 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+import bcrypt from "bcrypt"; // ✅ Added missing security hash library import
 
-const prisma = new PrismaClient();
+// Use the database connection string from the runtime environment variables
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log("🌱 Purging old records and starting premium marketplace seeding...");
@@ -133,4 +141,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end(); // Clean up connection socket channels cleanly
   });

@@ -1,12 +1,12 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Upgraded Role Matrix to natively include TECHNICIAN
 enum Role {
   CLIENT
   ADMIN
@@ -33,32 +33,43 @@ enum JobMatchStatus {
   COMPLETED
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  phone     String
-  password  String
-  role      Role     @default(CLIENT)
-  jobs      Job[]    @relation("ClientJobs")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// 2. Added Technician Identity Verification Status Tracker Enums
+enum VerificationStatus {
+  UNVERIFIED     // Registered phone number, but has not completed OTP verification
+  PENDING_DOCS   // Phone OTP verified, but hasn't uploaded CNIC or Selfie
+  UNDER_REVIEW   // CNIC and Selfie uploaded, waiting for Admin approval
+  VERIFIED       // Approved by admin, fully allowed to place bids and take jobs
+  REJECTED       // Verification rejected due to blurred or fraudulent documents
 }
 
-// 1. ADD NEW MAIN CATEGORY MODEL WITH ICON META MAP ROLES
+// User Model Configuration
+model User {
+  id              Int      @id @default(autoincrement())
+  name            String
+  email           String   @unique
+  phone           String   @unique
+  password        String
+  role            Role     @default(CLIENT)
+  isPhoneVerified Boolean  @default(false) // Added security signal check tracking line
+  jobs            Job[]    @relation("ClientJobs")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Category Relation Model
 model Category {
   id        Int       @id @default(autoincrement())
-  name      String    @unique // e.g., "Plumbing & Piping"
-  iconName  String            // e.g., "water-outline" for your Ionicons engine
+  name      String    @unique
+  iconName  String
   isActive  Boolean   @default(true)
   services  Service[] @relation("CategoryToServices")
 }
 
-// 2. REFRACTOR SERVICE TO ENFORCE STRICT RELATIONAL NORMALIZATION
+// Service Model Configuration
 model Service {
   id          Int       @id @default(autoincrement())
-  name        String    @unique // e.g., "Fixing Leaky Faucets"
-  description String?           // Comprehensive scope baseline
+  name        String    @unique
+  description String?
   priceType   PriceType @default(CUSTOM)
   isActive    Boolean   @default(true)
   jobs        Job[]     @relation("ServiceJobs")
@@ -67,6 +78,7 @@ model Service {
   category    Category  @relation("CategoryToServices", fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
+// Job Model Configuration
 model Job {
   id          Int        @id @default(autoincrement())
   title       String
@@ -92,21 +104,26 @@ model Job {
   @@index([clientId])
 }
 
+// 3. Upgraded Technician Verification Storage Layer
 model Technician {
-  id                Int        @id @default(autoincrement())
-  name              String
-  phone             String     @unique
-  cnicImageUrl      String?
-  skillCategory     String
-  city              String
-  whatsappGroupName String?
-  isVerified        Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id                 Int                @id @default(autoincrement())
+  name               String
+  phone              String             @unique
+  skillCategory      String
+  city               String
+  cnicNumber         String?            @unique // Secure Unique identity check matching PTA constraints
+  cnicImageUrl       String?
+  selfieImageUrl     String?            // Biometric face matching validation target
+  verificationStatus VerificationStatus @default(UNVERIFIED) // Controls real-time bidding gate permissions
+  isVerified         Boolean            @default(false)
+  whatsappGroupName  String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   
   matches           JobMatch[]
 }
 
+// JobMatch Model Configuration
 model JobMatch {
   id               Int            @id @default(autoincrement())
   commissionAmount Float

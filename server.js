@@ -23,9 +23,6 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// 1. Template Engine & Views Mounting
-app.set("view engine", "ejs");
-app.set("views", path.resolve("views"));
 
 // 2. Global Middleware Stack
 app.use(express.json());

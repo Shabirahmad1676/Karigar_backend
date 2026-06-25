@@ -24,3 +24,13 @@ export const adminAuthMiddleware = (req, res, next) => {
   }
   next();
 };
+
+// Append this function cleanly right at the bottom of your existing authMiddleware file
+export const enforceVerifiedTechnician = (req, res, next) => {
+  if (req.user.role === "TECHNICIAN" && req.user.verificationStatus !== "VERIFIED") {
+    return res.status(403).json({
+      message: "Access Denied: Your technical dispatch profile is currently undergoing document verification review.",
+    });
+  }
+  next();
+};
