@@ -37,3 +37,17 @@ export const getJobById = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getAvailableJobs = async (req, res, next) => {
+  try {
+    // Security Guard: Ensure only technicians can poll available marketplace listings
+    if (req.user.role !== "TECHNICIAN") {
+      return res.status(403).json({ message: "Forbidden: Only technician accounts can browse open requests" });
+    }
+    
+    const jobs = await jobService.getAvailableJobs();
+    return res.status(200).json(jobs);
+  } catch (err) {
+    next(err);
+  }
+};

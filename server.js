@@ -1,84 +1,96 @@
-// server.js
-import express from "express";
-import http from "http";
-import path from "path";
-import dotenv from "dotenv";
-import session from "express-session";
-import { Server } from "socket.io";
+  // server.js
+  import express from "express";
+  import http from "http";
+  import path from "path";
+  import dotenv from "dotenv";
+  import session from "express-session";
+  import { Server } from "socket.io";
 
-// Component & Routing Imports
-import authRoutes from "./src/routes/authRoutes.js";
-import jobRoutes from "./src/routes/jobRoutes.js";
-import serviceRoutes from "./src/routes/serviceRoutes.js";
-import adminRoutes from "./src/routes/adminRoutes.js";
+  // Component & Routing Imports
+  import authRoutes from "./src/routes/authRoutes.js";
+  import jobRoutes from "./src/routes/jobRoutes.js";
+  import serviceRoutes from "./src/routes/serviceRoutes.js";
+  import adminRoutes from "./src/routes/adminRoutes.js";
+  import technicianRoutes from "./src/routes/technicianRoutes.js";
 
-// Middleware & Configuration Core
-import { initializeSocket } from "./src/socket/socket.js";
-import { errorHandler } from "./src/middleware/errorHandler.js";
-import redisClient from "./src/config/redis.js";
-import { connectDB } from "./src/config/connectDB.js";
+  // Middleware & Configuration Core
+  import { initializeSocket } from "./src/socket/socket.js";
+  import { errorHandler } from "./src/middleware/errorHandler.js";
+  import redisClient from "./src/config/redis.js";
+  import { connectDB } from "./src/config/connectDB.js";
 
-dotenv.config();
+  dotenv.config();
 
-const app = express();
-const server = http.createServer(app);
+  const app = express();
+  const server = http.createServer(app);
+
+  // Add a simple global request logger to watch incoming traffic live
+  app.use((req, res, next) => {
+    console.log(`📡 INCOMING: ${req.method} ${req.url} - Content-Type: ${req.headers['content-type']}`);
+    next();
+  });
 
 
-// 2. Global Middleware Stack
-app.use(express.json());
-app.use("/uploads", express.static(path.resolve("uploads")));
+  // 2. Global Middleware Stack
+  app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+  app.set("view engine", "ejs");
+app.set("views", path.resolve("src/views"));
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || "karigar_session_fallback_secret",
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 Hours
-}));
+  app.use("/uploads", express.static(path.resolve("uploads")));
 
-// 3. Socket.io Cluster Engine Initiation
-const io = new Server(server, { cors: { origin: "*" } });
-initializeSocket(io);
+  app.use(session({
+    secret: process.env.SESSION_SECRET || "karigar_session_fallback_secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 Hours
+  }));
 
-io.on("connection", (socket) => {
-  console.log(`Client socket connected: ${socket.id}`);
-  socket.on("disconnect", () => console.log(`Client disconnected: ${socket.id}`));
-});
+  // 3. Socket.io Cluster Engine Initiation
+  const io = new Server(server, { cors: { origin: "*" } });
+  initializeSocket(io);
 
-// 4. Modular Traffic Routing Bindings
-app.use("/api/auth", authRoutes);
-app.use("/api/jobs", jobRoutes);
-app.use("/api/services", serviceRoutes);
-app.use("/admin", adminRoutes);
+  io.on("connection", (socket) => {
+    console.log(`Client socket connected: ${socket.id}`);
+    socket.on("disconnect", () => console.log(`Client disconnected: ${socket.id}`));
+  });
 
-// health api
-app.get("/api/health", (req, res) => {
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
-});
+  // 4. Modular Traffic Routing Bindings
+  app.use("/api/auth", authRoutes);
+  app.use("/api/jobs", jobRoutes);
+  app.use("/api/services", serviceRoutes);
+  app.use("/admin", adminRoutes);
+  app.use("/api/technicians", technicianRoutes);
 
-// 5. Global Exception Interceptor
-app.use(errorHandler);
+  // health api
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "OK", timestamp: new Date().toISOString() });
+  });
 
-// 6. Redis In-Memory Client Startup Engine
-try {
-    if (!redisClient.isReady) {
-        await redisClient.connect();
-    }
-} catch (redisError) {
-    console.error("Failed to connect to Redis on startup:", redisError);
-}
+  // 5. Global Exception Interceptor
+  app.use(errorHandler);
 
-// 7. Microservice Port Deployment Loop
-const PORT = process.env.PORT || 3000;
-const startServer = async () => {
+  // 6. Redis In-Memory Client Startup Engine
   try {
-    await connectDB();
-    server.listen(PORT, () => {
-      console.log(`🚀 Karigar Engine online executing on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("Failed to start application:", error.message);
-    process.exit(1);
+      if (!redisClient.isReady) {
+          await redisClient.connect();
+      }
+  } catch (redisError) {
+      console.error("Failed to connect to Redis on startup:", redisError);
   }
-};
 
-startServer();
+  // 7. Microservice Port Deployment Loop
+  const PORT = process.env.PORT || 3000;
+  const startServer = async () => {
+    try {
+      await connectDB();
+      server.listen(PORT, () => {
+        console.log(`🚀 Karigar Engine online executing on port ${PORT}`);
+      });
+    } catch (error) {
+      console.error("Failed to start application:", error.message);
+      process.exit(1);
+    }
+  };
+
+  startServer();

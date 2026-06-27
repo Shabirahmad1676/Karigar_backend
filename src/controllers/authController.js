@@ -56,26 +56,57 @@ export const register = async (req, res) => {
   }
 };
 
+
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body; // 'email' field variable receives either email string or roll-number key
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+    // Look up technician by raw email, phone number, or roll number key
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: email },
+          { phone: email },
+          { 
+            role: "TECHNICIAN",
+            id: {
+              in: await prisma.technician.findMany({
+                where: { whatsappGroupName: email }, // Searches the assigned code key slot
+                select: { id: true }
+              }).then(techs => techs.map(t => t.id))
+            }
+          }
+        ]
+      }
+    });
+
+    if (!user) return res.status(400).json({ message: "Invalid system credentials." });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(400).json({ message: "Invalid system credentials." });
+
+    let verificationStatus = "UNVERIFIED";
+let technicianIdKey = "";
+let technicianPhone = "";
+    if (user.role === "TECHNICIAN") {
+  const profile = await prisma.technician.findUnique({ where: { id: user.id } });
+  if (profile) {
+    verificationStatus = profile.verificationStatus;
+    technicianIdKey = profile.whatsappGroupName; // 👈 Extract custom roll ID
+    technicianPhone = profile.phone;             // 👈 Extract their actual phone number
+  }
+}
 
     const token = generateToken(user);
 
     return res.status(200).json({
-      message: "Login successful",
+      message: "Access Authorized",
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, 
+        name: user.name, 
+        role: user.role, 
+        verificationStatus,phone: 
+        technicianPhone, customId: technicianIdKey }
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

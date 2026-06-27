@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
-import bcrypt from "bcrypt"; // ✅ Added missing security hash library import
+import bcrypt from "bcrypt"; // Added missing security hash library import
 
 // Use the database connection string from the runtime environment variables
 const pool = new pg.Pool({

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Karigar Admin Onboarding Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f6f9; color: #333; padding: 40px 20px; display: flex; justify-content: center; }
+    .container { background: #ffffff; max-width: 600px; width: 100%; padding: 30px; borderRadius: 12px; boxShadow: 0 4px 20px rgba(0,0,0,0.08); }
+    h2 { color: #1e3a8a; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+    .form-group { margin-bottom: 18px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; color: #4b5563; }
+    input, select { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; outline: none; transition: border 0.2s; }
+    input:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .btn { display: inline-block; width: 100%; background: #1e3a8a; color: white; padding: 12px; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+    .btn:hover { background: #1d4ed8; }
+    .badge { background: #dcfce7; color: #15803d; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 15px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <span class="badge">System Access: Admin</span>
+  <h2>Onboard New Technician</h2>
+  <p class="subtitle">Enter the information gathered from your WhatsApp conversation to create their verified fleet credentials instantly.</p>
+
+  <form action="/admin/onboard" method="POST">
+    <div class="form-group">
+      <label for="name">Full Name (as per CNIC)</label>
+      <input type="text" id="name" name="name" placeholder="e.g., Shabir Ahmad" required>
+    </div>
+
+    <div class="form-group">
+      <label for="phone">Phone Number (WhatsApp Number)</label>
+      <input type="text" id="phone" name="phone" placeholder="e.g., 03331234567" required>
+    </div>
+
+    <div class="form-group">
+      <label for="cnicNumber">CNIC Number (13 Digits)</label>
+      <input type="text" id="cnicNumber" name="cnicNumber" placeholder="e.g., 1610112345671" maxlength="13" required>
+    </div>
+
+    <div class="form-group">
+      <label for="skillCategory">Trade / Skill Category</label>
+      <select id="skillCategory" name="skillCategory">
+        <option value="Plumber">Plumbing Specialist</option>
+        <option value="Electrician">Electrical Engineering</option>
+        <option value="AC Mechanic">HVAC & AC Maintenance</option>
+        <option value="Carpenter">Carpentry & Woodwork</option>
+        <option value="General Maintenance">General Maintenance</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="city">Operational City</label>
+      <select id="city" name="city">
+        <option value="Mardan">Mardan</option>
+        <option value="Peshawar">Peshawar</option>
+        <option value="Islamabad">Islamabad</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="plainPassword">Assign Simple Login Password</label>
+      <input type="text" id="plainPassword" name="plainPassword" placeholder="e.g., karigar123" required>
+    </div>
+
+    <button type="submit" class="btn">Generate Fleet Credentials</button>
+  </form>
+</div>
+
+</body>
+</html>

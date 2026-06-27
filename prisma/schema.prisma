@@ -99,7 +99,7 @@ model Job {
   service     Service    @relation("ServiceJobs", fields: [serviceId], references: [id])
   
   matches     JobMatch[]
-
+  bids        Bid[]      @relation("JobToBids")
   @@index([status])
   @@index([clientId])
 }
@@ -121,6 +121,7 @@ model Technician {
   updatedAt          DateTime           @updatedAt
   
   matches           JobMatch[]
+  bids              Bid[]      @relation("TechnicianToBids")
 }
 
 // JobMatch Model Configuration
@@ -137,4 +138,16 @@ model JobMatch {
 
   technicianId     Int
   technician       Technician     @relation(fields: [technicianId], references: [id])
+}
+model Bid {
+  id           Int        @id @default(autoincrement())
+  amount       Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  jobId        Int
+  job          Job        @relation("JobToBids", fields: [jobId], references: [id], onDelete: Cascade) // 👈 UPDATE THIS LINE
+
+  technicianId Int
+  technician   Technician @relation("TechnicianToBids", fields: [technicianId], references: [id], onDelete: Cascade) // 👈 UPDATE THIS LINE
 }

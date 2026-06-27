@@ -60,4 +60,16 @@ export const jobService = {
       },
     });
   },
+
+  async getAvailableJobs() {
+    return prisma.job.findMany({
+      where: { status: "PENDING" },
+      include: { 
+        service: {
+          include: { category: true } // Deep join schema to resolve service and category name
+        } 
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  },
 };

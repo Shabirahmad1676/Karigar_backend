@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credentials Generated Successfully</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f6f9; color: #333; padding: 40px 20px; display: flex; justify-content: center; }
+    .container { background: #ffffff; max-width: 550px; width: 100%; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+    .success-icon { font-size: 48px; color: #10b981; margin-bottom: 16px; }
+    h2 { color: #111827; margin-bottom: 8px; }
+    p.desc { color: #4b5563; font-size: 14px; margin-bottom: 24px; }
+    .credential-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 24px; position: relative; }
+    .field { margin-bottom: 12px; font-size: 15px; }
+    .field:last-child { margin-bottom: 0; }
+    .label { font-weight: 600; color: #4b5563; }
+    .value { font-family: 'Courier New', Courier, monospace; font-weight: 700; color: #1e3a8a; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; font-size: 16px; }
+    .btn-group { display: flex; gap: 12px; }
+    .btn { flex: 1; text-align: center; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #25d366; color: white; border: none; }
+    .btn-primary:hover { background: #22c55e; }
+    .btn-secondary { background: #6b7280; color: white; border: none; }
+    .btn-secondary:hover { background: #4b5563; }
+    .whatsapp-template { display: none; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="success-icon">✓</div>
+  <h2>Account Active & Verified</h2>
+  <p class="desc">The operational profile structure for <strong><%= name %></strong> has been written successfully to the system database.</p>
+
+  <div class="credential-card" id="credCard">
+    <div class="field">
+      <span class="label">Username / Login ID:</span> 
+      <span class="value" id="usernameVal"><%= usernameKey %></span>
+    </div>
+    <div class="field">
+      <span class="label">Temporary Password:</span> 
+      <span class="value"><%= password %></span>
+    </div>
+  </div>
+
+  <!-- Hidden text block container to ease fast manual selection copy loops -->
+  <textarea class="whatsapp-template" id="textTemplate">Salam <%= name %>! Your account on Karigar has been created and verified by admin. You can log in using these details:
+
+Login ID: <%= usernameKey %>
+Password: <%= password %>
+
+Open the application, type these details in, and start tracking your jobs!</textarea>
+
+  <div class="btn-group">
+    <button onclick="copyToClipboard()" class="btn btn-primary">Copy WhatsApp Message</button>
+    <a href="/admin/onboard" class="btn btn-secondary">Onboard Next Karigar</a>
+  </div>
+</div>
+
+<script>
+  function copyToClipboard() {
+    const copyText = document.getElementById("textTemplate");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999); // Mobile compatibility safety check
+    navigator.clipboard.writeText(copyText.value);
+    alert("WhatsApp registration credential template copied to clipboard!");
+  }
+</script>
+
+</body>
+</html>
