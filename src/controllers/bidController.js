@@ -53,115 +53,85 @@ export const acceptBid = async (req, res) => {
     const bidId = Number(req.params.bidId);
 
     if (req.user.role !== "CLIENT") {
-  return res.status(403).json({
-    message: "Only clients can accept bids",
-  });
-}
+      return res.status(403).json({ message: "Only clients can accept bids" });
+    }
 
-    // Find job
+    // Find the target job
     const job = await prisma.job.findUnique({
-      where: {
-        id: jobId,
-      },
+      where: { id: jobId },
     });
 
     if (!job) {
-      return res.status(404).json({
-        message: "Job not found",
-      });
+      return res.status(404).json({ message: "Job not found" });
     }
 
-    // Ensure owner
+    // Ensure authenticated owner check passes
     if (job.clientId !== req.user.id) {
-      return res.status(403).json({
-        message: "You are not allowed to accept bids for this job",
-      });
+      return res.status(403).json({ message: "You are not allowed to accept bids for this job" });
     }
 
-    // Find bid
+    // Find the selected bid along with its tech profile parameters
     const bid = await prisma.bid.findUnique({
-      where: {
-        id: bidId,
-      },
+      where: { id: bidId },
     });
 
-    if (!bid) {
-      return res.status(404).json({
-        message: "Bid not found",
-      });
+    if (!bid || bid.jobId !== jobId) {
+      return res.status(404).json({ message: "Bid does not belong to this job target footprint" });
     }
 
-    // Ensure bid belongs to this job
-    if (bid.jobId !== jobId) {
-      return res.status(400).json({
-        message: "Bid does not belong to this job",
-      });
+    if (job.status !== "PENDING") {
+      return res.status(400).json({ message: "Job has already been processed or matched" });
     }
 
-       if (job.status !== "PENDING") {
-  return res.status(400).json({
-    message: "Job has already been processed",
-  });
-}
-
-    // Transaction
+    // Enforce multi-table ACID relation safety bounds
     await prisma.$transaction(async (tx) => {
-
-      // Accept selected bid
-      await tx.bid.update({
-        where: {
-          id: bidId,
-        },
-        data: {
-          status: "ACCEPTED",
-        },
+      
+      // 1. Update overall job state to MATCHED
+      await tx.job.update({
+        where: { id: jobId },
+        data: { status: "MATCHED" },
       });
 
-      // Reject all other bids
-      await tx.bid.updateMany({
+      // 2. Clear out all other competitive unselected bids for this specific assignment
+      await tx.bid.deleteMany({
         where: {
           jobId,
-          id: {
-            not: bidId,
-          },
-        },
-        data: {
-          status: "REJECTED",
+          id: { not: bidId },
         },
       });
 
-      // Update job status
-      await tx.job.update({
-        where: {
-          id: jobId,
-        },
+      // 3. Automatically spawn a structural JobMatch ledger row mapping the chosen operator
+      // Dynamically calculate a 10% marketplace commission or fallback to a flat rate (e.g., Rs. 150)
+      const calculatedCommission = job.budget * 0.10; 
+
+      await tx.jobMatch.create({
         data: {
-          status: "ACCEPTED",
+          jobId: jobId,
+          technicianId: bid.technicianId,
+          commissionAmount: calculatedCommission,
+          status: "PENDING",
         },
       });
     });
 
-    // After successful transaction, fetch the accepted bid to get technicianId
-    const acceptedBid = await prisma.bid.findUnique({ where: { id: bidId } });
-
+    // Notify the successful technical dispatch operator over Socket channels
     const io = getIO();
-    if (acceptedBid && acceptedBid.technicianId) {
-      io.to(`user_${acceptedBid.technicianId}`).emit("bid_accepted", {
+    if (bid.technicianId) {
+      io.to(`user_${bid.technicianId}`).emit("bid_accepted", {
         jobId,
         bidId,
-        technicianId: acceptedBid.technicianId,
+        technicianId: bid.technicianId,
       });
     }
 
     return res.status(200).json({
-      message: "Bid accepted successfully",
+      message: "Bid accepted successfully! Fleet assignment is securely written to the ledger.",
     });
 
   } catch (error) {
-    console.error(error);
-
+    console.error("❌ CRASH INSIDE ACCEPT_BID:", error);
     return res.status(500).json({
-      message: "Internal server error",
+      message: "Internal server processing failure inside transaction loops.",
     });
   }
 };

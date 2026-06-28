@@ -56,7 +56,15 @@ export const jobService = {
         service: {
           include: { category: true }
         }, 
-        client: { select: { id: true, name: true, email: true } } 
+        client: { select: { id: true, name: true, email: true } },
+        bids: {
+          include: {
+            technician: {
+              select: { name: true, phone: true } // Joins matching identity records dynamically
+            }
+          },
+          orderBy: { createdAt: "desc" }
+        }
       },
     });
   },
