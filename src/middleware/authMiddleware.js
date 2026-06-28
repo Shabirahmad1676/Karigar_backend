@@ -25,12 +25,24 @@ export const adminAuthMiddleware = (req, res, next) => {
   next();
 };
 
-// Append this function cleanly right at the bottom of your existing authMiddleware file
-export const enforceVerifiedTechnician = (req, res, next) => {
-  if (req.user.role === "TECHNICIAN" && req.user.verificationStatus !== "VERIFIED") {
-    return res.status(403).json({
-      message: "Access Denied: Your technical dispatch profile is currently undergoing document verification review.",
-    });
+import prisma from "../lib/prisma.js"; // 👈 Ensure Prisma is imported at the top of the file
+
+export const enforceVerifiedTechnician = async (req, res, next) => {
+  try {
+    if (req.user.role === "TECHNICIAN") {
+      // Look up the actual live profile state inside the system ledger
+      const profile = await prisma.technician.findUnique({
+        where: { id: req.user.id }
+      });
+
+      if (!profile || profile.verificationStatus !== "VERIFIED") {
+        return res.status(403).json({
+          message: "Access Denied: Your technical dispatch profile is currently undergoing document verification review.",
+        });
+      }
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 };

@@ -4,9 +4,11 @@ import { enforceVerifiedTechnician } from "../middleware/authMiddleware.js";
 import { createBid } from "../controllers/bidController.js";
 import { upload } from "../config/multer.js"; // ✅ Import your existing multer utility
 import prisma from "../lib/prisma.js";
+import { getNearbyTechnicians } from "../controllers/authController.js";
 
 const router = express.Router();
 
+router.get("/nearby", getNearbyTechnicians);
 router.use(authMiddleware);
 
 // ✅ ADD THIS ROUTE: Handles both image data structures simultaneously

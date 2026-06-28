@@ -84,6 +84,7 @@ app.set("views", path.resolve("src/views"));
   const startServer = async () => {
     try {
       await connectDB();
+      await redisClient.connect();
       server.listen(PORT, () => {
         console.log(`🚀 Karigar Engine online executing on port ${PORT}`);
       });

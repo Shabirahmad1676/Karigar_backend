@@ -112,3 +112,25 @@ let technicianPhone = "";
     return res.status(500).json({ message: err.message });
   }
 };
+
+export const getNearbyTechnicians = async (req, res, next) => {
+  try {
+    // Collect active, vetted specialists to populate the marketplace board
+    const verifiedFleet = await prisma.technician.findMany({
+      where: {
+        verificationStatus: "VERIFIED",
+        isVerified: true
+      },
+      take: 6,
+      select: {
+        id: true,
+        name: true,
+        skillCategory: true,
+        city: true
+      }
+    });
+    return res.status(200).json(verifiedFleet);
+  } catch (err) {
+    next(err);
+  }
+};
