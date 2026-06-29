@@ -1,5 +1,6 @@
-// src/middleware/authMiddleware.js
+
 import jwt from "jsonwebtoken";
+import prisma from "../lib/prisma.js";
 
 export const authMiddleware = (req, res, next) => {
   try {
@@ -25,12 +26,9 @@ export const adminAuthMiddleware = (req, res, next) => {
   next();
 };
 
-import prisma from "../lib/prisma.js"; // 👈 Ensure Prisma is imported at the top of the file
-
 export const enforceVerifiedTechnician = async (req, res, next) => {
   try {
     if (req.user.role === "TECHNICIAN") {
-      // Look up the actual live profile state inside the system ledger
       const profile = await prisma.technician.findUnique({
         where: { id: req.user.id }
       });
@@ -42,7 +40,5 @@ export const enforceVerifiedTechnician = async (req, res, next) => {
       }
     }
     next();
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };

@@ -6,7 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// 1. Upgraded Role Matrix to natively include TECHNICIAN
 enum Role {
   CLIENT
   ADMIN
@@ -18,10 +17,12 @@ enum PriceType {
   CUSTOM
 }
 
+// 📦 Added ARRIVED status to safely track active operational steps
 enum JobStatus {
   PENDING
   POSTED
   MATCHED
+  ARRIVED
   COMPLETED
   CANCELLED
 }
@@ -33,16 +34,20 @@ enum JobMatchStatus {
   COMPLETED
 }
 
-// 2. Added Technician Identity Verification Status Tracker Enums
 enum VerificationStatus {
-  UNVERIFIED     // Registered phone number, but has not completed OTP verification
-  PENDING_DOCS   // Phone OTP verified, but hasn't uploaded CNIC or Selfie
-  UNDER_REVIEW   // CNIC and Selfie uploaded, waiting for Admin approval
-  VERIFIED       // Approved by admin, fully allowed to place bids and take jobs
-  REJECTED       // Verification rejected due to blurred or fraudulent documents
+  UNVERIFIED     
+  PENDING_DOCS   
+  UNDER_REVIEW   
+  VERIFIED       
+  REJECTED       
 }
 
-// User Model Configuration
+// 📦 Premium Monetization Tiers
+enum TechTier {
+  FREE
+  PREMIUM
+}
+
 model User {
   id              Int      @id @default(autoincrement())
   name            String
@@ -50,13 +55,13 @@ model User {
   phone           String   @unique
   password        String
   role            Role     @default(CLIENT)
-  isPhoneVerified Boolean  @default(false) // Added security signal check tracking line
+  isPhoneVerified Boolean  @default(false) 
   jobs            Job[]    @relation("ClientJobs")
+  reviewsWritten  Review[] @relation("ClientReviews")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
-// Category Relation Model
 model Category {
   id        Int       @id @default(autoincrement())
   name      String    @unique
@@ -65,7 +70,6 @@ model Category {
   services  Service[] @relation("CategoryToServices")
 }
 
-// Service Model Configuration
 model Service {
   id          Int       @id @default(autoincrement())
   name        String    @unique
@@ -78,7 +82,6 @@ model Service {
   category    Category  @relation("CategoryToServices", fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
-// Job Model Configuration
 model Job {
   id          Int        @id @default(autoincrement())
   title       String
@@ -100,31 +103,37 @@ model Job {
   
   matches     JobMatch[]
   bids        Bid[]      @relation("JobToBids")
+  review      Review?    @relation("JobToReview")
+
   @@index([status])
   @@index([clientId])
 }
 
-// 3. Upgraded Technician Verification Storage Layer
 model Technician {
   id                 Int                @id @default(autoincrement())
   name               String
   phone              String             @unique
   skillCategory      String
   city               String
-  cnicNumber         String?            @unique // Secure Unique identity check matching PTA constraints
+  cnicNumber         String?            @unique 
   cnicImageUrl       String?
-  selfieImageUrl     String?            // Biometric face matching validation target
-  verificationStatus VerificationStatus @default(UNVERIFIED) // Controls real-time bidding gate permissions
+  selfieImageUrl     String?            
+  verificationStatus VerificationStatus @default(UNVERIFIED) 
   isVerified         Boolean            @default(false)
   whatsappGroupName  String?
+  
+  // 📦 Monetization and Operational State Fields
+  tier               TechTier           @default(FREE)
+  isWorking          Boolean            @default(false)
+  
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   
   matches           JobMatch[]
-  bids              Bid[]      @relation("TechnicianToBids")
+  bids              Bid[]              @relation("TechnicianToBids")
+  reviewsReceived   Review[]           @relation("TechnicianReviews")
 }
 
-// JobMatch Model Configuration
 model JobMatch {
   id               Int            @id @default(autoincrement())
   commissionAmount Float
@@ -139,6 +148,7 @@ model JobMatch {
   technicianId     Int
   technician       Technician     @relation(fields: [technicianId], references: [id])
 }
+
 model Bid {
   id           Int        @id @default(autoincrement())
   amount       Int
@@ -146,8 +156,25 @@ model Bid {
   updatedAt    DateTime   @updatedAt
 
   jobId        Int
-  job          Job        @relation("JobToBids", fields: [jobId], references: [id], onDelete: Cascade) // 👈 UPDATE THIS LINE
+  job          Job        @relation("JobToBids", fields: [jobId], references: [id], onDelete: Cascade)
 
   technicianId Int
-  technician   Technician @relation("TechnicianToBids", fields: [technicianId], references: [id], onDelete: Cascade) // 👈 UPDATE THIS LINE
+  technician   Technician @relation("TechnicianToBids", fields: [technicianId], references: [id], onDelete: Cascade)
+}
+
+// 📦 Cohesive Trust Review Loop
+model Review {
+  id           Int        @id @default(autoincrement())
+  rating       Int        
+  comment      String?
+  createdAt    DateTime   @default(now())
+
+  jobId        Int        @unique
+  job          Job        @relation("JobToReview", fields: [jobId], references: [id], onDelete: Cascade)
+
+  clientId     Int
+  client       User       @relation("ClientReviews", fields: [clientId], references: [id])
+
+  technicianId Int
+  technician   Technician @relation("TechnicianReviews", fields: [technicianId], references: [id], onDelete: Cascade)
 }

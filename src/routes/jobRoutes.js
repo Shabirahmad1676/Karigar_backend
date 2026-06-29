@@ -1,5 +1,5 @@
 import express from "express";
-import { createJob, getMyJobs, getJobById, getAvailableJobs } from "../controllers/jobController.js";
+import { createJob, getMyJobs, getJobById, getAvailableJobs, postJobReview } from "../controllers/jobController.js";
 import { uploadJobImage } from "../controllers/jobImageController.js";
 import { acceptBid } from "../controllers/bidController.js"; // 👈 Keep only this one
 import { authMiddleware } from "../middleware/authMiddleware.js";
@@ -18,5 +18,6 @@ router.post("/:id/image", upload.single("image"), uploadJobImage);
 
 // This line matches your frontend call perfectly
 router.post("/bids/:jobId/accept/:bidId", acceptBid);
+router.post("/:jobId/review", postJobReview);
 
 export default router;
