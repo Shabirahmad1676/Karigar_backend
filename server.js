@@ -1,4 +1,6 @@
   // server.js
+  import redisClient from "./src/config/redis.js";
+  import { connectDB } from "./src/config/connectDB.js";
   import express from "express";
   import http from "http";
   import path from "path";
@@ -16,9 +18,7 @@
   // Middleware & Configuration Core
   import { initializeSocket } from "./src/socket/socket.js";
   import { errorHandler } from "./src/middleware/errorHandler.js";
-  import redisClient from "./src/config/redis.js";
-  import { connectDB } from "./src/config/connectDB.js";
-
+  
   dotenv.config();
 
   const app = express();
@@ -81,17 +81,26 @@ app.set("views", path.resolve("src/views"));
 
   // 7. Microservice Port Deployment Loop
   const PORT = process.env.PORT || 3000;
-  const startServer = async () => {
+  
+  async function startServer() {
+  // 1. Safe PostgreSQL connection verification
+  await connectDB();
+  
+  // 2. Fail-safe Redis connection block (Checks if socket is already open before connecting)
+  if (!redisClient.isOpen) {
     try {
-      await connectDB();
       await redisClient.connect();
-      server.listen(PORT, () => {
-        console.log(`🚀 Karigar Engine online executing on port ${PORT}`);
-      });
-    } catch (error) {
-      console.error("Failed to start application:", error.message);
-      process.exit(1);
+    } catch (redisErr) {
+      console.warn("⚠️ Redis socket notice:", redisErr.message);
     }
-  };
+  }
+  
+  // 3. SINGLE, UNIFIED server listener bind command
+  // Ensure you do NOT have any other 'server.listen' lines below this block!
+  server.listen(PORT, () => console.log(`🚀 Karigar Engine live on port ${PORT}`));
+}
 
-  startServer();
+startServer().catch(err => {
+  console.error("💥 FAILED TO INITIALIZE FLEET CORE ENGINE:", err);
+  process.exit(1);
+});
