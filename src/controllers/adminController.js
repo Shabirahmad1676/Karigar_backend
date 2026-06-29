@@ -62,3 +62,45 @@ export const adminCreateTechnician = async (req, res, next) => {
     next(err);
   }
 };
+
+export const onboardTechnician = async (req, res) => {
+  try {
+    const { name, phone, skillCategory, city, cnicNumber, selfieImageUrl } = req.body;
+
+    // Use a clean fallback placeholder link if the administrator leaves the photo field empty
+    const profileAvatar = selfieImageUrl || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Provisions account record entry values inside the general identity User table
+      await tx.user.create({
+        data: {
+          name,
+          phone,
+          email: `${phone}@karigar.com`,
+          password: "hashed_default_password", // Safe baseline profile initialization placeholder string
+          role: "TECHNICIAN",
+          isPhoneVerified: true
+        }
+      });
+
+      // 2. Maps companion attributes seamlessly inside the technical fleet table catalog lines
+      await tx.technician.create({
+        data: {
+          name,
+          phone,
+          skillCategory,
+          city,
+          cnicNumber,
+          selfieImageUrl: profileAvatar, // 👈 Saved cleanly to database
+          verificationStatus: "VERIFIED",
+          isVerified: true
+        }
+      });
+    });
+
+    return res.render("onboard-success", { name, phone });
+  } catch (error) {
+    console.error("Onboarding crash:", error);
+    return res.status(500).send("Failed to save technician profile configuration parameters.");
+  }
+};

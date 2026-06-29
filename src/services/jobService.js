@@ -21,21 +21,32 @@ export const jobService = {
   },
 
   async createJob(clientId, jobData) {
-    return prisma.job.create({
-      data: {
-        clientId,
-        serviceId: parseInt(jobData.serviceId),
-        title: jobData.title,
-        description: jobData.description,
-        budget: parseInt(jobData.budget),
-        latitude: jobData.latitude ? parseFloat(jobData.latitude) : null,
-        longitude: jobData.longitude ? parseFloat(jobData.longitude) : null,
-        address: jobData.address,
-        imageUrl: jobData.imageUrl,
-        status: "PENDING",
-      },
-    });
-  },
+  // 1. Await database creation and assign to a variable
+  const newJob = await prisma.job.create({
+    data: {
+      clientId,
+      serviceId: parseInt(jobData.serviceId),
+      title: jobData.title,
+      description: jobData.description,
+      budget: parseInt(jobData.budget),
+      latitude: jobData.latitude ? parseFloat(jobData.latitude) : null,
+      longitude: jobData.longitude ? parseFloat(jobData.longitude) : null,
+      address: jobData.address,
+      imageUrl: jobData.imageUrl,
+      status: "PENDING",
+    },
+  });
+
+  // 2. Broadcast the event out to all connected technicians securely
+  const io = getIO();
+  io.emit("new_job_available", { 
+    message: "A new job listing has been posted in the area!",
+    jobId: newJob.id
+  });
+
+  // 3. Return the completed object to the controller layer
+  return newJob;
+},
 
   async getClientJobs(clientId) {
     return prisma.job.findMany({
