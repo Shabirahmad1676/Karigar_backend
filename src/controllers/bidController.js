@@ -11,6 +11,15 @@ export const createBid = async (req, res) => {
     const { amount } = req.body; 
     const technicianId = req.user.id; 
 
+    const existingBid = await prisma.bid.findFirst({
+  where: { jobId, technicianId }
+});
+if (existingBid) {
+  return res.status(400).json({ 
+    error: "Bidding Restricted: You have already submitted a proposal for this job ticket." 
+  });
+}
+
     // 1. Fetch Technician Profile and Active constraints
     const technician = await prisma.technician.findUnique({
       where: { id: technicianId },

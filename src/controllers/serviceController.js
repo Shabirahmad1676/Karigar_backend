@@ -12,9 +12,9 @@ export const getServices = async (req, res, next) => {
 
 export const getServiceById = async (req, res, next) => {
   try {
-    const service = await jobService.getServiceById(req.params.id);
-    if (!service) return res.status(404).json({ message: "Service not found" });
-    return res.status(200).json(service);
+    const category = await jobService.getCategoryById(req.params.id);
+    if (!category) return res.status(404).json({ message: "Category not found" });
+    return res.status(200).json(category);
   } catch (err) {
     next(err);
   }

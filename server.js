@@ -4,6 +4,7 @@
   import express from "express";
   import http from "http";
   import path from "path";
+  import { fileURLToPath } from "url";
   import dotenv from "dotenv";
   import session from "express-session";
   import { Server } from "socket.io";
@@ -22,6 +23,10 @@
   dotenv.config();
 
   const app = express();
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
   const server = http.createServer(app);
 
   // Add a simple global request logger to watch incoming traffic live
