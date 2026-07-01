@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { getIO } from "../socket/socket.js";
 
 export const jobService = {
   // Returns main categories alongside their children nested arrays
@@ -17,6 +18,17 @@ export const jobService = {
     return prisma.service.findUnique({
       where: { id: parseInt(id) },
       include: { category: true } // Joins category parent context data automatically
+    });
+  },
+
+  async getCategoryById(id) {
+    return prisma.category.findUnique({
+      where: { id: parseInt(id), isActive: true },
+      include: {
+        services: {
+          where: { isActive: true }
+        }
+      }
     });
   },
 

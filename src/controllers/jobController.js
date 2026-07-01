@@ -1,5 +1,7 @@
 import { jobService } from "../services/jobService.js";
 import { createJobReview } from "./bidController.js";
+import prisma from "../lib/prisma.js";
+
 
 export const createJob = async (req, res, next) => {
   try {
@@ -13,9 +15,28 @@ export const createJob = async (req, res, next) => {
 
 export const getMyJobs = async (req, res, next) => {
   try {
+    // 🌟 FIX 2: Differentiate queries based on account role mappings
+    if (req.user.role === "TECHNICIAN") {
+      const technicianJobs = await prisma.job.findMany({
+        where: {
+          matches: {
+            some: { technicianId: req.user.id }
+          }
+        },
+        include: {
+          service: { include: { category: true } }
+        },
+        orderBy: { createdAt: "desc" }
+      });
+      return res.status(200).json(technicianJobs);
+    }
+
+    // Fallback for standard CLIENT role requests
     const jobs = await jobService.getClientJobs(req.user.id);
     return res.status(200).json(jobs);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
 export const getJobById = async (req, res, next) => {
