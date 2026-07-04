@@ -80,6 +80,7 @@ export const jobService = {
           include: { category: true }
         }, 
         client: { select: { id: true, name: true, email: true } },
+        review:true,
         bids: {
           include: {
             technician: {

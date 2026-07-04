@@ -1,10 +1,10 @@
 import express from "express";
 import { renderOnboardingForm, adminCreateTechnician } from "../controllers/adminController.js";
+import { upload } from "../config/multer.js"; 
 
 const router = express.Router();
 
-// Laptop UI controller route allocations
 router.get("/onboard", renderOnboardingForm);
-router.post("/onboard", adminCreateTechnician);
+router.post("/onboard", upload.single("selfieImageFile"), adminCreateTechnician);
 
 export default router;
