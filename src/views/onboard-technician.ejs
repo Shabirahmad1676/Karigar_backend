@@ -27,7 +27,7 @@
   <h2>Onboard New Technician</h2>
   <p class="subtitle">Enter the information gathered from your WhatsApp conversation to create their verified fleet credentials instantly.</p>
 
-  <form action="/admin/onboard" method="POST">
+  <form action="/admin/onboard" method="POST" enctype="multipart/form-data">
     <div class="form-group">
       <label for="name">Full Name (as per CNIC)</label>
       <input type="text" id="name" name="name" placeholder="e.g., Shabir Ahmad" required>
@@ -64,9 +64,9 @@
     </div>
 
     <div class="form-group">
-      <label for="selfieImageUrl">Technician Public Profile Image URL</label>
-      <input type="url" id="selfieImageUrl" name="selfieImageUrl" placeholder="e.g., https://images.unsplash.com/photo-..." required>
-    </div>
+  <label for="selfieImageFile">Upload Technician Profile Photograph (Selfie)</label>
+  <input type="file" id="selfieImageFile" name="selfieImageFile" accept="image/*" required>
+</div>
 
     <div class="form-group">
       <label for="plainPassword">Assign Simple Login Password</label>

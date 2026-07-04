@@ -3,6 +3,28 @@ import bcrypt from "bcrypt";
 import { generateToken } from "../utils/generateToken.js";
 
 
+export const getNearbyTechnicians = async (req, res, next) => {
+  try {
+    const verifiedFleet = await prisma.technician.findMany({
+      where: {
+        verificationStatus: "VERIFIED",
+        isVerified: true
+      },
+      take: 6,
+      select: {
+        id: true,
+        name: true,
+        skillCategory: true,
+        city: true,
+        selfieImageUrl: true
+      }
+    });
+
+    // Returns absolute Cloudinary path links straight down to mobile app layout displays!
+    return res.status(200).json(verifiedFleet);
+  } catch (err) { next(err); }
+};
+
 export const register = async (req, res) => {
   try {
     const { name, email, phone, password, role, skillCategory, city } = req.body;
@@ -56,7 +78,6 @@ export const register = async (req, res) => {
   }
 };
 
-
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body; // 'email' field variable receives either email string or roll-number key
@@ -92,8 +113,8 @@ let technicianPhone = "";
   const profile = await prisma.technician.findUnique({ where: { id: user.id } });
   if (profile) {
     verificationStatus = profile.verificationStatus;
-    technicianIdKey = profile.whatsappGroupName; // 👈 Extract custom roll ID
-    technicianPhone = profile.phone;             // 👈 Extract their actual phone number
+    technicianIdKey = profile.whatsappGroupName; //  Extract custom roll ID
+    technicianPhone = profile.phone;             //  Extract their actual phone number
   }
 }
 
@@ -104,33 +125,14 @@ let technicianPhone = "";
       token,
       user: { id: user.id, 
         name: user.name, 
+        email: user.email,
         role: user.role, 
-        verificationStatus,phone: 
-        technicianPhone, customId: technicianIdKey }
+        verificationStatus,
+        phone: technicianPhone,
+        customId: technicianIdKey }
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
-
-export const getNearbyTechnicians = async (req, res, next) => {
-  try {
-    // Collect active, vetted specialists to populate the marketplace board
-    const verifiedFleet = await prisma.technician.findMany({
-      where: {
-        verificationStatus: "VERIFIED",
-        isVerified: true
-      },
-      take: 6,
-      select: {
-        id: true,
-        name: true,
-        skillCategory: true,
-        city: true
-      }
-    });
-    return res.status(200).json(verifiedFleet);
-  } catch (err) {
-    next(err);
-  }
-};
+;

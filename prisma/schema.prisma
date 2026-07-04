@@ -58,6 +58,7 @@ model User {
   isPhoneVerified Boolean  @default(false) 
   jobs            Job[]    @relation("ClientJobs")
   reviewsWritten  Review[] @relation("ClientReviews")
+  notifications Notification[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -177,4 +178,14 @@ model Review {
 
   technicianId Int
   technician   Technician @relation("TechnicianReviews", fields: [technicianId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int      
+  title       String
+  message     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

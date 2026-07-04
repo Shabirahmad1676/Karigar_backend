@@ -1,5 +1,7 @@
 import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
+import cloudinary from "../config/cloudinary.js";
+import fs from "fs";
 
 export const renderOnboardingForm = (req, res) => {
   res.render("onboard-technician"); 
@@ -9,29 +11,33 @@ export const adminCreateTechnician = async (req, res, next) => {
   try {
     const { name, phone, cnicNumber, skillCategory, city, plainPassword } = req.body;
 
-    if (!name || !phone || !cnicNumber || !plainPassword) {
-      return res.status(400).send("Core administrative input parameters are missing.");
+    if (!name || !phone || !cnicNumber || !plainPassword || !req.file) {
+      return res.status(400).send("Core parameters or technician profile image file missing.");
     }
+
+    // 1. Stream binary image up to Cloudinary securely
+    const cloudUpload = await cloudinary.uploader.upload(req.file.path, {
+      folder: "karigar_fleet_selfies",
+    });
+
+    // Clean local upload scratch space safely
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    // Multi-Table Transaction Block enforces strict relational integrity
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Core user table authentication account registration 
       const newUser = await tx.user.create({
         data: {
           name,
-          email: `${phone}@karigar.com`, // Auto-generated fallback internal system email
+          email: `${phone}@karigar.com`,
           phone,
           password: hashedPassword,
           role: "TECHNICIAN",
         },
       });
 
-      // 2. Generate custom university roll-number-style serial tracker string
       const formattedId = `KG-${city.substring(0,3).toUpperCase()}-2026-${String(newUser.id).padStart(3, '0')}`;
 
-      // 3. Populate matching verified profile parameters cleanly
       await tx.technician.create({
         data: {
           id: newUser.id,
@@ -41,10 +47,10 @@ export const adminCreateTechnician = async (req, res, next) => {
           city: city || "Mardan",
           cnicNumber,
           cnicImageUrl: "VERIFIED_MANUALLY_VIA_WHATSAPP",
-          selfieImageUrl: "VERIFIED_MANUALLY_VIA_WHATSAPP",
-          verificationStatus: "VERIFIED", // Bypass in-app queue gatekeepers
+          selfieImageUrl: cloudUpload.secure_url,
+          verificationStatus: "VERIFIED",
           isVerified: true,
-          whatsappGroupName: formattedId // Store generated user ID credentials safely inside this slot
+          whatsappGroupName: formattedId
         }
       });
 
@@ -57,10 +63,7 @@ export const adminCreateTechnician = async (req, res, next) => {
       systemEmail: result.user.email,
       password: plainPassword
     });
-
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 export const onboardTechnician = async (req, res) => {
