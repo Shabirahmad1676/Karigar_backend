@@ -19,6 +19,22 @@ export const createBid = async (req, res) => {
     const { amount } = req.body;
     const technicianId = req.user.id;
 
+    const existingBid = await prisma.bid.findUnique({
+      where: {
+        jobId_technicianId: {
+          jobId,
+          technicianId
+        }
+      }
+    });
+
+    if (existingBid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Duplicate Proposal Blocked: You have already submitted a active quote rate for this job item." 
+      });
+    }
+
     // Fetch details matching job allocation blueprint references
     const job = await prisma.job.findUnique({ where: { id: jobId } });
     
@@ -41,11 +57,39 @@ export const acceptBid = async (req, res) => {
   try {
     const jobId = Number(req.params.jobId);
     const bidId = Number(req.params.bidId);
-    const bid = await prisma.bid.findUnique({ where: { id: bidId } });
+    const bid = await prisma.bid.findUnique({ where: { id: bidId }, include: { technician: true } });
 
-    await prisma.$transaction(async (tx) => {
-      // Execute your core MATCHED status database modification lines here...
-    });
+    if (!bid) {
+      return res.status(404).json({ message: "The selected bid proposal could not be found." });
+    }
+
+   await prisma.$transaction(async (tx) => {
+      
+      // Step A: Update the Job status and finalize its budget to matching bid amount
+      await tx.job.update({
+        where: { id: jobId },
+        data: { 
+          status: "MATCHED",
+          budget: bid.amount // Lock the price to the technician's bid rate
+        }
+      });
+
+      await tx.technician.update({
+        where: { id: bid.technicianId },
+        data: { isWorking: true }
+      });
+
+      const platformCommission = bid.amount * 0.10;
+      await tx.jobMatch.create({
+        data: {
+          jobId: jobId,
+          technicianId: bid.technicianId,
+          commissionAmount: platformCommission,
+          status: "PENDING"
+        }
+      });
+
+      });
 
     // Notify the technician immediately that their bid proposal has won the dispatch match contract!
     await triggerNotification(
@@ -53,6 +97,10 @@ export const acceptBid = async (req, res) => {
       "Bid Accepted! 🛠️",
       `Pack your tools! Your quote for Job ticket reference ID #${jobId} has been accepted by the client.`
     );
+
+    const io = getIO();
+    io.to("technicians").emit("bid_accepted", { jobId });
+    io.emit("job_status_changed", { jobId, status: "MATCHED" });
 
     return res.status(200).json({ message: "Assignment finalized." });
   } catch (error) { return res.status(500).json({ message: "Error processing." }); }
@@ -114,6 +162,9 @@ export const technicianCompletedJob = async (req, res, next) => {
       // 4. Clean up the winning bid entry row from the platform memory
       await tx.bid.deleteMany({ where: { jobId } });
     });
+
+    const io = getIO();
+io.emit("job_status_changed", { jobId, status: "COMPLETED" });
 
     return res.status(200).json({ message: "Job marked complete. Dispatch technician is free for next bookings." });
   } catch (err) { next(err); }
