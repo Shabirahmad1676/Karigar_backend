@@ -2,6 +2,7 @@
   import redisClient from "./src/config/redis.js";
   import { connectDB } from "./src/config/connectDB.js";
   import express from "express";
+  import cors from 'cors'
   import http from "http";
   import path from "path";
   import { fileURLToPath } from "url";
@@ -36,6 +37,12 @@
     next();
   });
 
+  app.use(cors({
+  origin: 'http://localhost:8081', // Allows requests from your Expo web app
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allows your Bearer token header
+  credentials: true // Optional: allow cookies if you decide to use them later
+}));
 
   // 2. Global Middleware Stack
   app.use(express.json());
@@ -101,9 +108,7 @@ app.set("views", path.resolve("src/views"));
     }
   }
   
-  // 3. SINGLE, UNIFIED server listener bind command
-  // Ensure you do NOT have any other 'server.listen' lines below this block!
-  server.listen(PORT, () => console.log(`🚀 Karigar Engine live on port ${PORT}`));
+  server.listen(PORT, '0.0.0.0', () => console.log(`🚀 Karigar Engine live on port ${PORT}`));
 }
 
 startServer().catch(err => {

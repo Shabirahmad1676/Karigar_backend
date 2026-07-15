@@ -161,6 +161,7 @@ model Bid {
 
   technicianId Int
   technician   Technician @relation("TechnicianToBids", fields: [technicianId], references: [id], onDelete: Cascade)
+  @@unique([jobId, technicianId])
 }
 
 // 📦 Cohesive Trust Review Loop
