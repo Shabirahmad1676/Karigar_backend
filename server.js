@@ -1,117 +1,118 @@
-  // server.js
-  import redisClient from "./src/config/redis.js";
-  import { connectDB } from "./src/config/connectDB.js";
-  import express from "express";
-  import cors from 'cors'
-  import http from "http";
-  import path from "path";
-  import { fileURLToPath } from "url";
-  import dotenv from "dotenv";
-  import session from "express-session";
-  import { Server } from "socket.io";
+// server.js
+import redisClient from "./src/config/redis.js";
+import { connectDB } from "./src/config/connectDB.js";
+import express from "express";
+import cors from 'cors';
+import http from "http";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import session from "express-session";
+import { Server } from "socket.io";
 
-  // Component & Routing Imports
-  import authRoutes from "./src/routes/authRoutes.js";
-  import jobRoutes from "./src/routes/jobRoutes.js";
-  import serviceRoutes from "./src/routes/serviceRoutes.js";
-  import adminRoutes from "./src/routes/adminRoutes.js";
-  import technicianRoutes from "./src/routes/technicianRoutes.js";
-  import notificationRoutes from "./src/routes/notificationRoutes.js";
+// Component & Routing Imports
+import authRoutes from "./src/routes/authRoutes.js";
+import jobRoutes from "./src/routes/jobRoutes.js";
+import serviceRoutes from "./src/routes/serviceRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js";
+import technicianRoutes from "./src/routes/technicianRoutes.js";
+import notificationRoutes from "./src/routes/notificationRoutes.js";
 
-  // Middleware & Configuration Core
-  import { initializeSocket } from "./src/socket/socket.js";
-  import { errorHandler } from "./src/middleware/errorHandler.js";
-  
-  dotenv.config();
+// Middleware & Configuration Core
+import { initializeSocket } from "./src/socket/socket.js";
+import { errorHandler } from "./src/middleware/errorHandler.js";
 
-  const app = express();
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
+dotenv.config();
 
-  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-  const server = http.createServer(app);
+const app = express();
+const server = http.createServer(app); // FIXED: Defined server instance before passing to Socket.io cluster
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Add a simple global request logger to watch incoming traffic live
-  app.use((req, res, next) => {
-    console.log(`📡 INCOMING: ${req.method} ${req.url} - Content-Type: ${req.headers['content-type']}`);
-    next();
-  });
+// Global request logger to watch incoming traffic live
+app.use((req, res, next) => {
+  console.log(`📡 INCOMING: ${req.method} ${req.url} - Content-Type: ${req.headers['content-type']}`);
+  next();
+});
 
-  app.use(cors({
+app.use(cors({
   origin: 'http://localhost:8081', // Allows requests from your Expo web app
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allows your Bearer token header
-  credentials: true // Optional: allow cookies if you decide to use them later
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allows Bearer token header
+  credentials: true 
 }));
 
-  // 2. Global Middleware Stack
-  app.use(express.json());
+// Global Middleware Stack
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-  app.set("view engine", "ejs");
-app.set("views", path.resolve("src/views"));
 
-  app.use("/uploads", express.static(path.resolve("uploads")));
+// Dynamic View Engine Path Configuration Alignment
+app.set("view engine", "ejs");
+app.set("views", path.join(process.cwd(), "src", "views"));
 
-  app.use(session({
-    secret: process.env.SESSION_SECRET || "karigar_session_fallback_secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 Hours
-  }));
+// Unified Static Asset Folder Handling
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-  // 3. Socket.io Cluster Engine Initiation
-  const io = new Server(server, { cors: { origin: "*" } });
-  initializeSocket(io);
+app.use(session({
+  secret: process.env.SESSION_SECRET || "karigar_session_fallback_secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 Hours
+}));
 
-  io.on("connection", (socket) => {
-    console.log(`Client socket connected: ${socket.id}`);
-    socket.on("disconnect", () => console.log(`Client disconnected: ${socket.id}`));
-  });
+// Socket.io Cluster Engine Initiation
+const io = new Server(server, { cors: { origin: "*" } }); // FIXED: Resolves ReferenceError safely
+initializeSocket(io);
 
-  // 4. Modular Traffic Routing Bindings
-  app.use("/api/auth", authRoutes);
-  app.use("/api/jobs", jobRoutes);
-  app.use("/api/services", serviceRoutes);
-  app.use("/admin", adminRoutes);
-  app.use("/api/technicians", technicianRoutes);
-  app.use("/api/notifications", notificationRoutes);
-  // health api
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "OK", timestamp: new Date().toISOString() });
-  });
+io.on("connection", (socket) => {
+  console.log(`Client socket connected: ${socket.id}`);
+  socket.on("disconnect", () => console.log(`Client disconnected: ${socket.id}`));
+});
 
-  // 5. Global Exception Interceptor
-  app.use(errorHandler);
+// Modular Traffic Routing Bindings
+app.use("/api/auth", authRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/admin", adminRoutes);
+app.use("/api/technicians", technicianRoutes);
+app.use("/api/notifications", notificationRoutes);
 
-  // 6. Redis In-Memory Client Startup Engine
-  try {
-      if (!redisClient.isReady) {
-          await redisClient.connect();
-      }
-  } catch (redisError) {
-      console.error("Failed to connect to Redis on startup:", redisError);
-  }
+// Health API
+app.get("/api/health", (req, res) => {
+  res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
 
-  // 7. Microservice Port Deployment Loop
-  const PORT = process.env.PORT || 3000;
-  
-  async function startServer() {
+// Global Exception Interceptor
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 3000;
+
+async function startServer() {
   // 1. Safe PostgreSQL connection verification
-  await connectDB();
-  
-  // 2. Fail-safe Redis connection block (Checks if socket is already open before connecting)
-  if (!redisClient.isOpen) {
-    try {
-      await redisClient.connect();
-    } catch (redisErr) {
-      console.warn("⚠️ Redis socket notice:", redisErr.message);
-    }
+  try {
+    await connectDB();
+  } catch (dbErr) {
+    console.error("💥 FAILED TO CONNECT TO DATABASE SCHEMA:", dbErr);
+    process.exit(1);
   }
   
-  server.listen(PORT, '0.0.0.0', () => console.log(`🚀 Karigar Engine live on port ${PORT}`));
+  // 2. Fail-safe asynchronous Redis connection block (Does NOT block server.listen thread if cache is slow/offline)
+  if (!redisClient.isOpen) {
+    redisClient.connect()
+      .then(() => console.log("🚀 Redis Client Connected Successfully"))
+      .catch((redisErr) => {
+        console.warn("⚠️ Non-Fatal Redis Connection Failure on boot:", redisErr.message);
+        console.warn("🛡️ System running in fallback database-only state safely.");
+      });
+  }
+  
+  // 3. Mount the server process immediately on your network interface targets
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Karigar Fleet Engine completely initialized on port ${PORT}`);
+  });
 }
 
 startServer().catch(err => {
-  console.error("💥 FAILED TO INITIALIZE FLEET CORE ENGINE:", err);
+  console.error("💥 CRITICAL FLEET RUNTIME INITIALIZATION FAILURE:", err);
   process.exit(1);
 });

@@ -1,3 +1,4 @@
+<!-- src/views/onboard-technician.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +12,8 @@
     h2 { color: #1e3a8a; margin-bottom: 8px; font-size: 24px; font-weight: 700; }
     p.subtitle { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
     .form-group { margin-bottom: 20px; }
+    .coordinate-row { display: flex; gap: 16px; margin-bottom: 20px; }
+    .coordinate-row .form-group { flex: 1; margin-bottom: 0; }
     label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; color: #374151; }
     input, select { width: 100%; padding: 11px 14px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; outline: none; transition: all 0.2s; color: #1f2937; }
     input:focus, select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
@@ -21,28 +24,24 @@
   </style>
 </head>
 <body>
-
 <div class="container">
   <span class="badge">System Access: Admin</span>
   <h2>Onboard New Technician</h2>
   <p class="subtitle">Enter the information gathered from your WhatsApp conversation to create their verified fleet credentials instantly.</p>
-
+  
   <form action="/admin/onboard" method="POST" enctype="multipart/form-data">
     <div class="form-group">
       <label for="name">Full Name (as per CNIC)</label>
       <input type="text" id="name" name="name" placeholder="e.g., Shabir Ahmad" required>
     </div>
-
     <div class="form-group">
       <label for="phone">Phone Number (WhatsApp Number)</label>
       <input type="text" id="phone" name="phone" placeholder="e.g., 03331234567" required>
     </div>
-
     <div class="form-group">
       <label for="cnicNumber">CNIC Number (13 Digits)</label>
       <input type="text" id="cnicNumber" name="cnicNumber" placeholder="e.g., 1610112345671" maxlength="13" required>
     </div>
-
     <div class="form-group">
       <label for="skillCategory">Trade / Skill Category</label>
       <select id="skillCategory" name="skillCategory">
@@ -53,7 +52,6 @@
         <option value="General Maintenance">General Maintenance</option>
       </select>
     </div>
-
     <div class="form-group">
       <label for="city">Operational City</label>
       <select id="city" name="city">
@@ -63,19 +61,28 @@
       </select>
     </div>
 
-    <div class="form-group">
-  <label for="selfieImageFile">Upload Technician Profile Photograph (Selfie)</label>
-  <input type="file" id="selfieImageFile" name="selfieImageFile" accept="image/*" required>
-</div>
+    <!-- Spatial GPS Form Control Input Block Group -->
+    <div class="coordinate-row">
+      <div class="form-group">
+        <label for="latitude">Latitude</label>
+        <input type="number" step="any" id="latitude" name="latitude" placeholder="e.g. 34.1989" required>
+      </div>
+      <div class="form-group">
+        <label for="longitude">Longitude</label>
+        <input type="number" step="any" id="longitude" name="longitude" placeholder="e.g. 72.0497" required>
+      </div>
+    </div>
 
+    <div class="form-group">
+      <label for="selfieImageFile">Upload Technician Profile Photograph (Selfie)</label>
+      <input type="file" id="selfieImageFile" name="selfieImageFile" accept="image/*" required>
+    </div>
     <div class="form-group">
       <label for="plainPassword">Assign Simple Login Password</label>
       <input type="text" id="plainPassword" name="plainPassword" placeholder="e.g., karigar123" required>
     </div>
-
     <button type="submit" class="btn">Generate Fleet Credentials</button>
   </form>
 </div>
-
 </body>
 </html>

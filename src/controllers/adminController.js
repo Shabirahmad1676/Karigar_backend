@@ -1,21 +1,22 @@
+// src/controllers/adminController.js
 import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
 
 export const renderOnboardingForm = (req, res) => {
-  res.render("onboard-technician"); 
+  res.render("onboard-technician");
 };
 
 export const adminCreateTechnician = async (req, res, next) => {
   try {
-    const { name, phone, cnicNumber, skillCategory, city, plainPassword } = req.body;
-
-    if (!name || !phone || !cnicNumber || !plainPassword || !req.file) {
-      return res.status(400).send("Core parameters or technician profile image file missing.");
+    const { name, phone, cnicNumber, skillCategory, city, plainPassword, latitude, longitude } = req.body;
+    
+    if (!name || !phone || !cnicNumber || !plainPassword || !req.file || !latitude || !longitude) {
+      return res.status(400).send("Core parameters, technician coordinates, or profile image file missing.");
     }
 
-    // 1. Stream binary image up to Cloudinary securely
+    // Stream binary image up to Cloudinary securely
     const cloudUpload = await cloudinary.uploader.upload(req.file.path, {
       folder: "karigar_fleet_selfies",
     });
@@ -50,7 +51,10 @@ export const adminCreateTechnician = async (req, res, next) => {
           selfieImageUrl: cloudUpload.secure_url,
           verificationStatus: "VERIFIED",
           isVerified: true,
-          whatsappGroupName: formattedId
+          whatsappGroupName: formattedId,
+          // Save spatial tracking configurations
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude)
         }
       });
 
@@ -63,30 +67,28 @@ export const adminCreateTechnician = async (req, res, next) => {
       systemEmail: result.user.email,
       password: plainPassword
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const onboardTechnician = async (req, res) => {
   try {
-    const { name, phone, skillCategory, city, cnicNumber, selfieImageUrl } = req.body;
-
-    // Use a clean fallback placeholder link if the administrator leaves the photo field empty
+    const { name, phone, skillCategory, city, cnicNumber, selfieImageUrl, latitude, longitude } = req.body;
     const profileAvatar = selfieImageUrl || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
     await prisma.$transaction(async (tx) => {
-      // 1. Provisions account record entry values inside the general identity User table
       await tx.user.create({
         data: {
           name,
           phone,
           email: `${phone}@karigar.com`,
-          password: "hashed_default_password", // Safe baseline profile initialization placeholder string
+          password: "hashed_default_password", 
           role: "TECHNICIAN",
           isPhoneVerified: true
         }
       });
 
-      // 2. Maps companion attributes seamlessly inside the technical fleet table catalog lines
       await tx.technician.create({
         data: {
           name,
@@ -94,9 +96,11 @@ export const onboardTechnician = async (req, res) => {
           skillCategory,
           city,
           cnicNumber,
-          selfieImageUrl: profileAvatar, // 👈 Saved cleanly to database
+          selfieImageUrl: profileAvatar,
           verificationStatus: "VERIFIED",
-          isVerified: true
+          isVerified: true,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null
         }
       });
     });
