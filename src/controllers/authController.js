@@ -1,14 +1,70 @@
+// src/controllers/authController.js
 import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
 import { generateToken } from "../utils/generateToken.js";
+import redisClient from "../config/redis.js";
 
-
+/**
+ * Fetch technicians near the client using raw Haversine spatial SQL computation.
+ * Falls back to city-based caching if coordinates are missing.
+ * @route GET /api/technicians/nearby
+ */
 export const getNearbyTechnicians = async (req, res, next) => {
   try {
+    const { lat, lng, radiusKm } = req.query;
+    const cityParam = req.query.city || "Mardan";
+    const cleanCity = cityParam.trim().toLowerCase();
+    const radius = parseFloat(radiusKm) || 15;
+
+    // Convert query text parameters to floating point coordinate metrics safely
+    const clientLat = parseFloat(lat);
+    const clientLng = parseFloat(lng);
+
+    // If coordinates are valid numbers, execute accurate distance calculation mapping
+    if (!isNaN(clientLat) && !isNaN(clientLng)) {
+      const technicians = await prisma.$queryRaw`
+        SELECT 
+          id, name, "skillCategory", city, "selfieImageUrl", "isWorking", latitude, longitude,
+          (6371 * acos(
+            cos(radians(${clientLat})) * cos(radians(latitude)) * 
+            cos(radians(longitude) - radians(${clientLng})) + 
+            sin(radians(${clientLat})) * sin(radians(latitude))
+          )) AS distance
+        FROM "Technician"
+        WHERE "verificationStatus" = 'VERIFIED' 
+          AND "isVerified" = true
+          AND latitude IS NOT NULL 
+          AND longitude IS NOT NULL
+          AND (6371 * acos(
+            cos(radians(${clientLat})) * cos(radians(latitude)) * 
+            cos(radians(longitude) - radians(${clientLng})) + 
+            sin(radians(${clientLat})) * sin(radians(latitude))
+          )) <= ${radius}
+        ORDER BY distance ASC
+        LIMIT 10;
+      `;
+      
+      return res.status(200).json(technicians);
+    }
+    
+    // Fallback: Create a dynamic cache key based on the city name
+    const CACHE_KEY = `nearby_technicians:${cleanCity}`;
+    const CACHE_EXPIRATION = 300; // 5 minutes
+
+    // Check Redis cache first
+    if (redisClient.isReady) {
+      const cachedData = await redisClient.get(CACHE_KEY);
+      if (cachedData) {
+        return res.status(200).json(JSON.parse(cachedData));
+      }
+    }
+
+    // Cache miss: Fetch from Postgres filtered by this specific city
     const verifiedFleet = await prisma.technician.findMany({
       where: {
         verificationStatus: "VERIFIED",
-        isVerified: true
+        isVerified: true,
+        city: { equals: cityParam, mode: 'insensitive' }
       },
       take: 6,
       select: {
@@ -16,18 +72,75 @@ export const getNearbyTechnicians = async (req, res, next) => {
         name: true,
         skillCategory: true,
         city: true,
-        selfieImageUrl: true
+        selfieImageUrl: true,
+        isWorking: true
       }
     });
 
-    // Returns absolute Cloudinary path links straight down to mobile app layout displays!
+    // Save the results back into Redis using the city-specific key
+    if (redisClient.isReady && verifiedFleet.length > 0) {
+      await redisClient.setEx(CACHE_KEY, CACHE_EXPIRATION, JSON.stringify(verifiedFleet));
+    }
+
     return res.status(200).json(verifiedFleet);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
+
+export const getTechnicianProfileById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const technicianId = parseInt(id);
+
+    if (isNaN(technicianId)) {
+      return res.status(400).json({ message: "Invalid profile identifier lookup configuration." });
+    }
+
+    const profile = await prisma.technician.findUnique({
+      where: { id: technicianId, isVerified: true },
+      select: {
+        id: true,
+        name: true,
+        skillCategory: true,
+        city: true,
+        selfieImageUrl: true,
+        tier: true,
+        isWorking: true,
+        reviewsReceived: {
+          select: {
+            id: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+            client: {
+              select: { name: true }
+            }
+          },
+          orderBy: { createdAt: "desc" }
+        }
+      }
+    });
+
+    if (!profile) {
+      return res.status(404).json({ message: "Technical dispatch profile could not be located." });
+    }
+
+    return res.status(200).json(profile);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+/**
+ * Register a new client profile or technician dispatch account profile entries.
+ * @route POST /api/auth/register
+ */
 export const register = async (req, res) => {
   try {
-    const { name, email, phone, password, role, skillCategory, city } = req.body;
+    const { name, email, phone, password, role, skillCategory, city, latitude, longitude } = req.body;
     
     if (!name || !email || !phone || !password || !role) {
       return res.status(400).json({ message: "All core fields are required" });
@@ -40,7 +153,6 @@ export const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Dynamic relational execution block
     const user = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -52,15 +164,16 @@ export const register = async (req, res) => {
         },
       });
 
-      // If signing up as an on-demand specialist, spawn their fleet profile automatically
       if (role === "TECHNICIAN") {
         await tx.technician.create({
           data: {
-            id: newUser.id, // Keep IDs identical or relate them via a Foreign Key row depending on schema
+            id: newUser.id,
             name,
             phone,
             skillCategory: skillCategory || "General Maintenance",
             city: city || "Mardan",
+            latitude: latitude ? parseFloat(latitude) : null,
+            longitude: longitude ? parseFloat(longitude) : null,
           }
         });
       }
@@ -78,11 +191,14 @@ export const register = async (req, res) => {
   }
 };
 
+/**
+ * Authenticate login data strings across multiple identification variables.
+ * @route POST /api/auth/login
+ */
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body; // 'email' field variable receives either email string or roll-number key
+    const { email, password } = req.body;
 
-    // Look up technician by raw email, phone number, or roll number key
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -92,7 +208,7 @@ export const login = async (req, res) => {
             role: "TECHNICIAN",
             id: {
               in: await prisma.technician.findMany({
-                where: { whatsappGroupName: email }, // Searches the assigned code key slot
+                where: { whatsappGroupName: email },
                 select: { id: true }
               }).then(techs => techs.map(t => t.id))
             }
@@ -107,32 +223,34 @@ export const login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Invalid system credentials." });
 
     let verificationStatus = "UNVERIFIED";
-let technicianIdKey = "";
-let technicianPhone = "";
+    let technicianIdKey = "";
+    let technicianPhone = "";
+    
     if (user.role === "TECHNICIAN") {
-  const profile = await prisma.technician.findUnique({ where: { id: user.id } });
-  if (profile) {
-    verificationStatus = profile.verificationStatus;
-    technicianIdKey = profile.whatsappGroupName; //  Extract custom roll ID
-    technicianPhone = profile.phone;             //  Extract their actual phone number
-  }
-}
+      const profile = await prisma.technician.findUnique({ where: { id: user.id } });
+      if (profile) {
+        verificationStatus = profile.verificationStatus;
+        technicianIdKey = profile.whatsappGroupName; 
+        technicianPhone = profile.phone;             
+      }
+    }
 
     const token = generateToken(user);
 
     return res.status(200).json({
       message: "Access Authorized",
       token,
-      user: { id: user.id, 
+      user: { 
+        id: user.id, 
         name: user.name, 
         email: user.email,
         role: user.role, 
         verificationStatus,
         phone: technicianPhone,
-        customId: technicianIdKey }
+        customId: technicianIdKey 
+      }
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
-;

@@ -1,13 +1,14 @@
 import express from "express";
 import { authMiddleware, enforceVerifiedTechnician } from "../middleware/authMiddleware.js";
 import { createBid, technicianArrived, technicianCompletedJob } from "../controllers/bidController.js";
-import { getNearbyTechnicians } from "../controllers/authController.js";
+import { getNearbyTechnicians, getTechnicianProfileById } from "../controllers/authController.js";
 import { upload } from "../config/multer.js";
 import prisma from "../lib/prisma.js";
 
 const router = express.Router();
 
 router.get("/nearby", getNearbyTechnicians);
+router.get("/profile/:id", getTechnicianProfileById); 
 router.use(authMiddleware);
 
 // 📦 NEW OPERATIONAL PATHWAYS: Arrival & Completion Lifecycle States

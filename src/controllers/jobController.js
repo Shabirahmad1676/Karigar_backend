@@ -15,7 +15,7 @@ export const createJob = async (req, res, next) => {
 
 export const getMyJobs = async (req, res, next) => {
   try {
-    // 🌟 FIX 2: Differentiate queries based on account role mappings
+    //  FIX 2: Differentiate queries based on account role mappings
     if (req.user.role === "TECHNICIAN") {
       const technicianJobs = await prisma.job.findMany({
         where: {

@@ -122,8 +122,10 @@ model Technician {
   verificationStatus VerificationStatus @default(UNVERIFIED) 
   isVerified         Boolean            @default(false)
   whatsappGroupName  String?
+
+  latitude           Float?
+  longitude          Float?
   
-  // 📦 Monetization and Operational State Fields
   tier               TechTier           @default(FREE)
   isWorking          Boolean            @default(false)
   
@@ -133,6 +135,8 @@ model Technician {
   matches           JobMatch[]
   bids              Bid[]              @relation("TechnicianToBids")
   reviewsReceived   Review[]           @relation("TechnicianReviews")
+
+  @@index([latitude, longitude])
 }
 
 model JobMatch {
@@ -164,7 +168,7 @@ model Bid {
   @@unique([jobId, technicianId])
 }
 
-// 📦 Cohesive Trust Review Loop
+//  Cohesive Trust Review Loop
 model Review {
   id           Int        @id @default(autoincrement())
   rating       Int        
