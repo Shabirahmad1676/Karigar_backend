@@ -16,18 +16,19 @@ export const adminCreateTechnician = async (req, res, next) => {
       return res.status(400).send("Core parameters, technician coordinates, or profile image file missing.");
     }
 
-    // Stream binary image up to Cloudinary securely
+    // 1. Core Upload Processing (Safely Outside DB Connections)
     const cloudUpload = await cloudinary.uploader.upload(req.file.path, {
       folder: "karigar_fleet_selfies",
     });
 
-    // Clean local upload scratch space safely
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    const result = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
+    // 2. Sequential Query Operations (Eliminating Transaction Deadlocks)
+    let newUser;
+    try {
+      newUser = await prisma.user.create({
         data: {
           name,
           email: `${phone}@karigar.com`,
@@ -36,35 +37,44 @@ export const adminCreateTechnician = async (req, res, next) => {
           role: "TECHNICIAN",
         },
       });
+    } catch (userError) {
+      console.error("User allocation failed:", userError);
+      return res.status(500).send("Failed to allocate initial user authentication profiles.");
+    }
 
-      const formattedId = `KG-${city.substring(0,3).toUpperCase()}-2026-${String(newUser.id).padStart(3, '0')}`;
+    // 3. Dependent Generation Step (Runs safely with a locked User ID)
+    const currentCity = city || "Mardan";
+    const formattedId = `KG-${currentCity.substring(0,3).toUpperCase()}-2026-${String(newUser.id).padStart(3, '0')}`;
 
-      await tx.technician.create({
+    try {
+      await prisma.technician.create({
         data: {
-          id: newUser.id,
+          id: newUser.id, // Maps directly to the established User ID row
           name,
           phone,
           skillCategory: skillCategory || "General Maintenance",
-          city: city || "Mardan",
+          city: currentCity,
           cnicNumber,
           cnicImageUrl: "VERIFIED_MANUALLY_VIA_WHATSAPP",
           selfieImageUrl: cloudUpload.secure_url,
           verificationStatus: "VERIFIED",
           isVerified: true,
           whatsappGroupName: formattedId,
-          // Save spatial tracking configurations
           latitude: parseFloat(latitude),
           longitude: parseFloat(longitude)
         }
       });
-
-      return { usernameId: formattedId, user: newUser };
-    });
+    } catch (techError) {
+      console.error("Technician compilation failed, initiating automatic rollback:", techError);
+      // Rollback: Delete the orphaned user row to keep the database clean
+      await prisma.user.delete({ where: { id: newUser.id } });
+      return res.status(500).send("Database processing error. User creation has been safely rolled back.");
+    }
 
     return res.render("onboard-success", { 
-      name: result.user.name,
-      usernameKey: result.usernameId, 
-      systemEmail: result.user.email,
+      name: newUser.name,
+      usernameKey: formattedId, 
+      systemEmail: newUser.email,
       password: plainPassword
     });
   } catch (err) {
@@ -72,25 +82,27 @@ export const adminCreateTechnician = async (req, res, next) => {
   }
 };
 
+
 export const onboardTechnician = async (req, res) => {
   try {
     const { name, phone, skillCategory, city, cnicNumber, selfieImageUrl, latitude, longitude } = req.body;
     const profileAvatar = selfieImageUrl || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-    await prisma.$transaction(async (tx) => {
-      await tx.user.create({
-        data: {
-          name,
-          phone,
-          email: `${phone}@karigar.com`,
-          password: "hashed_default_password", 
-          role: "TECHNICIAN",
-          isPhoneVerified: true
-        }
-      });
+    const createdUser = await prisma.user.create({
+      data: {
+        name,
+        phone,
+        email: `${phone}@karigar.com`,
+        password: "hashed_default_password", 
+        role: "TECHNICIAN",
+        isPhoneVerified: true
+      }
+    });
 
-      await tx.technician.create({
+    try {
+      await prisma.technician.create({
         data: {
+          id: createdUser.id,
           name,
           phone,
           skillCategory,
@@ -103,7 +115,10 @@ export const onboardTechnician = async (req, res) => {
           longitude: longitude ? parseFloat(longitude) : null
         }
       });
-    });
+    } catch (techErr) {
+      await prisma.user.delete({ where: { id: createdUser.id } });
+      throw techErr;
+    }
 
     return res.render("onboard-success", { name, phone });
   } catch (error) {

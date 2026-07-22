@@ -17,6 +17,7 @@ import serviceRoutes from "./src/routes/serviceRoutes.js";
 import adminRoutes from "./src/routes/adminRoutes.js";
 import technicianRoutes from "./src/routes/technicianRoutes.js";
 import notificationRoutes from "./src/routes/notificationRoutes.js";
+import chatRoutes from "./src/routes/chatRoutes.js";
 
 // Middleware & Configuration Core
 import { initializeSocket } from "./src/socket/socket.js";
@@ -76,6 +77,7 @@ app.use("/api/services", serviceRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/technicians", technicianRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Health API
 app.get("/api/health", (req, res) => {

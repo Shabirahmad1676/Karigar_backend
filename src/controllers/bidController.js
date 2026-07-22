@@ -2,47 +2,49 @@ import prisma from "../lib/prisma.js";
 import { getIO } from "../socket/socket.js";
 
 const triggerNotification = async (userId, title, message) => {
-  // 1. Persist notification safely inside DB storage ledger lines
   const notification = await prisma.notification.create({
     data: { userId, title, message }
   });
 
-  // 2. Dispatch real-time websocket transport notification payload out instantly
   const io = getIO();
   io.to(`user_${userId}`).emit("new_notification", notification);
 };
 
 export const createBid = async (req, res) => {
   try {
-    // Standard validation checking context...
-    const jobId = parseInt(req.params.jobId);
+    const jobId = parseInt(req.params.jobId, 10);
     const { amount } = req.body;
     const technicianId = req.user.id;
 
+    if (isNaN(jobId)) {
+      return res.status(400).json({ error: "Invalid Job ID provided." });
+    }
+
     const existingBid = await prisma.bid.findUnique({
       where: {
-        jobId_technicianId: {
-          jobId,
-          technicianId
-        }
+        jobId_technicianId: { jobId, technicianId }
       }
     });
 
     if (existingBid) {
       return res.status(400).json({ 
         success: false, 
-        error: "Duplicate Proposal Blocked: You have already submitted a active quote rate for this job item." 
+        error: "Duplicate Proposal Blocked: You have already submitted an active quote rate for this job item." 
       });
     }
 
-    // Fetch details matching job allocation blueprint references
+    // 1. Fetch job and check if it exists before using job.clientId
     const job = await prisma.job.findUnique({ where: { id: jobId } });
-    
+    if (!job) {
+      return res.status(404).json({ error: "Job ticket reference not found." });
+    }
+
+    // 2. Create the bid
     const bid = await prisma.bid.create({
       data: { amount, jobId, technicianId },
     });
 
-    // Alert Client instantly that a new technician quote proposal has arrived
+    // 3. Notify client safely
     await triggerNotification(
       job.clientId,
       "New Bid Received! 💰",
@@ -50,35 +52,46 @@ export const createBid = async (req, res) => {
     );
 
     return res.status(201).json(bid);
-  } catch (err) { return res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    return res.status(500).json({ error: err.message }); 
+  }
 };
 
 export const acceptBid = async (req, res) => {
   try {
     const jobId = Number(req.params.jobId);
     const bidId = Number(req.params.bidId);
-    const bid = await prisma.bid.findUnique({ where: { id: bidId }, include: { technician: true } });
+
+    if (isNaN(jobId) || isNaN(bidId)) {
+      return res.status(400).json({ message: "Invalid jobId or bidId provided." });
+    }
+
+    const bid = await prisma.bid.findUnique({ 
+      where: { id: bidId }, 
+      include: { technician: true } 
+    });
 
     if (!bid) {
       return res.status(404).json({ message: "The selected bid proposal could not be found." });
     }
 
-   await prisma.$transaction(async (tx) => {
-      
-      // Step A: Update the Job status and finalize its budget to matching bid amount
+    await prisma.$transaction(async (tx) => {
+      // 1. Update job status and lock budget
       await tx.job.update({
         where: { id: jobId },
         data: { 
           status: "MATCHED",
-          budget: bid.amount // Lock the price to the technician's bid rate
+          budget: bid.amount 
         }
       });
 
+      // 2. Mark technician as working
       await tx.technician.update({
         where: { id: bid.technicianId },
         data: { isWorking: true }
       });
 
+      // 3. Create JobMatch row
       const platformCommission = bid.amount * 0.10;
       await tx.jobMatch.create({
         data: {
@@ -89,28 +102,35 @@ export const acceptBid = async (req, res) => {
         }
       });
 
+      // 4. Safely create ChatRoom if it doesn't exist
+      await tx.chatRoom.upsert({
+        where: { jobId: jobId },
+        create: { jobId: jobId },
+        update: {}
       });
+    });
 
-    // Notify the technician immediately that their bid proposal has won the dispatch match contract!
+    // Notify technician & dispatch websocket alerts
     await triggerNotification(
       bid.technicianId,
-      "Bid Accepted! 🛠️",
-      `Pack your tools! Your quote for Job ticket reference ID #${jobId} has been accepted by the client.`
+      "Bid Accepted! Pack your tools!",
+      `Your quote for Job ticket reference ID #${jobId} has been accepted.`
     );
-
+    
     const io = getIO();
     io.to("technicians").emit("bid_accepted", { jobId });
     io.emit("job_status_changed", { jobId, status: "MATCHED" });
 
-    return res.status(200).json({ message: "Assignment finalized." });
-  } catch (error) { return res.status(500).json({ message: "Error processing." }); }
+    return res.status(200).json({ message: "Assignment finalized and chat room activated." });
+  } catch (error) { 
+    console.error("🔴 acceptBid Error:", error);
+    return res.status(500).json({ message: error.message || "Error processing acceptance." }); 
+  }
 };
 
-
-//  NEW OPERATIONAL WORKFLOW: Track technician's arrival at site
 export const technicianArrived = async (req, res, next) => {
   try {
-    const jobId = parseInt(req.params.jobId);
+    const jobId = parseInt(req.params.jobId, 10);
     const technicianId = req.user.id;
 
     const match = await prisma.jobMatch.findFirst({
@@ -128,10 +148,9 @@ export const technicianArrived = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-//  NEW OPERATIONAL WORKFLOW: Job Completed Loop Closure
 export const technicianCompletedJob = async (req, res, next) => {
   try {
-    const jobId = parseInt(req.params.jobId);
+    const jobId = parseInt(req.params.jobId, 10);
     const technicianId = req.user.id;
 
     const match = await prisma.jobMatch.findFirst({
@@ -141,39 +160,34 @@ export const technicianCompletedJob = async (req, res, next) => {
     if (!match) return res.status(404).json({ message: "Active on-site job matching criteria not found." });
 
     await prisma.$transaction(async (tx) => {
-      // 1. Transition job to COMPLETED state
       await tx.job.update({
         where: { id: jobId },
         data: { status: "COMPLETED" }
       });
 
-      // 2. Clear out technician's working constraint block lock
       await tx.technician.update({
         where: { id: technicianId },
         data: { isWorking: false }
       });
 
-      // 3. Mark the ledger transaction row status as COMPLETED
       await tx.jobMatch.update({
         where: { id: match.id },
         data: { status: "COMPLETED" }
       });
 
-      // 4. Clean up the winning bid entry row from the platform memory
       await tx.bid.deleteMany({ where: { jobId } });
     });
 
     const io = getIO();
-io.emit("job_status_changed", { jobId, status: "COMPLETED" });
+    io.emit("job_status_changed", { jobId, status: "COMPLETED" });
 
     return res.status(200).json({ message: "Job marked complete. Dispatch technician is free for next bookings." });
   } catch (err) { next(err); }
 };
 
-//  NEW OPERATIONAL WORKFLOW: Leave a review for technician
 export const createJobReview = async (req, res, next) => {
   try {
-    const jobId = parseInt(req.params.jobId);
+    const jobId = parseInt(req.params.jobId, 10);
     const { rating, comment } = req.body;
     const clientId = req.user.id;
 
@@ -195,7 +209,7 @@ export const createJobReview = async (req, res, next) => {
 
     const review = await prisma.review.create({
       data: {
-        rating: parseInt(rating),
+        rating: parseInt(rating, 10),
         comment,
         jobId,
         clientId,
