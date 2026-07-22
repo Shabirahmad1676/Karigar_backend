@@ -17,7 +17,7 @@ enum PriceType {
   CUSTOM
 }
 
-// 📦 Added ARRIVED status to safely track active operational steps
+//  Added ARRIVED status to safely track active operational steps
 enum JobStatus {
   PENDING
   POSTED
@@ -42,7 +42,7 @@ enum VerificationStatus {
   REJECTED       
 }
 
-// 📦 Premium Monetization Tiers
+//  Premium Monetization Tiers
 enum TechTier {
   FREE
   PREMIUM
@@ -105,6 +105,7 @@ model Job {
   matches     JobMatch[]
   bids        Bid[]      @relation("JobToBids")
   review      Review?    @relation("JobToReview")
+  chatRoom     ChatRoom?
 
   @@index([status])
   @@index([clientId])
@@ -193,4 +194,28 @@ model Notification {
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatRoom {
+  id           Int       @id @default(autoincrement())
+  jobId        Int       @unique
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  messages     Message[]
+
+  @@index([jobId])
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  roomId     Int
+  room       ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId   Int      // Matches User.id (Client or Technician)
+  text       String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([roomId])
+  @@index([senderId])
 }
