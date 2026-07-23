@@ -1,4 +1,3 @@
-// src/routes/notificationRoutes.js
 import express from "express";
 import prisma from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
@@ -14,7 +13,9 @@ router.get("/", async (req, res, next) => {
       take: 20
     });
     return res.status(200).json(notifications);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 });
 
 export default router;

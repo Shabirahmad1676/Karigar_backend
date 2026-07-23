@@ -8,7 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import session from "express-session";
-import { Server } from "socket.io";
+import { Server } from "socket.io"; // Added Socket.io importer back safely
 
 // Component & Routing Imports
 import authRoutes from "./src/routes/authRoutes.js";
@@ -26,9 +26,19 @@ import { errorHandler } from "./src/middleware/errorHandler.js";
 dotenv.config();
 
 const app = express();
-const server = http.createServer(app); // FIXED: Defined server instance before passing to Socket.io cluster
+const server = http.createServer(app); 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ====== FIX: INITIALIZE SOCKET.IO ENGINE HERE ======
+const io = new Server(server, { 
+  cors: { 
+    origin: "http://localhost:8081",
+    methods: ["GET", "POST"]
+  } 
+}); 
+initializeSocket(io); // Safely register all handlers once inside socket.js
+// ===================================================
 
 // Global request logger to watch incoming traffic live
 app.use((req, res, next) => {
@@ -61,15 +71,6 @@ app.use(session({
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 Hours
 }));
 
-// Socket.io Cluster Engine Initiation
-const io = new Server(server, { cors: { origin: "*" } }); // FIXED: Resolves ReferenceError safely
-initializeSocket(io);
-
-io.on("connection", (socket) => {
-  console.log(`Client socket connected: ${socket.id}`);
-  socket.on("disconnect", () => console.log(`Client disconnected: ${socket.id}`));
-});
-
 // Modular Traffic Routing Bindings
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -98,7 +99,7 @@ async function startServer() {
     process.exit(1);
   }
   
-  // 2. Fail-safe asynchronous Redis connection block (Does NOT block server.listen thread if cache is slow/offline)
+  // 2. Fail-safe asynchronous Redis connection block
   if (!redisClient.isOpen) {
     redisClient.connect()
       .then(() => console.log("🚀 Redis Client Connected Successfully"))
