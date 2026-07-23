@@ -1,13 +1,30 @@
 import prisma from "../lib/prisma.js";
 import { getIO } from "../socket/socket.js";
+import { sendPushNotification } from "../services/notificationService.js";
 
-const triggerNotification = async (userId, title, message) => {
-  const notification = await prisma.notification.create({
-    data: { userId, title, message }
-  });
+const triggerNotification = async (userId, title, message, data = {}) => {
+  try {
+    // 1. Store in Database
+    const notification = await prisma.notification.create({
+      data: { userId, title, message }
+    });
 
-  const io = getIO();
-  io.to(`user_${userId}`).emit("new_notification", notification);
+    // 2. Broadcast live WebSocket event (Foreground active users)
+    const io = getIO();
+    io.to(`user_${userId}`).emit("new_notification", notification);
+
+    // 3. Dispatch Native Expo Push Notification (Background / Terminated state users)
+    sendPushNotification({
+      targetUserId: userId,
+      title,
+      body: message,
+      data,
+    }).catch((err) => console.error("[Bid Notification Push Error]:", err));
+
+    return notification;
+  } catch (error) {
+    console.error("[Trigger Notification Error]:", error);
+  }
 };
 
 export const createBid = async (req, res) => {

@@ -35,11 +35,11 @@ enum JobMatchStatus {
 }
 
 enum VerificationStatus {
-  UNVERIFIED     
-  PENDING_DOCS   
-  UNDER_REVIEW   
-  VERIFIED       
-  REJECTED       
+  UNVERIFIED
+  PENDING_DOCS
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
 }
 
 //  Premium Monetization Tiers
@@ -48,27 +48,38 @@ enum TechTier {
   PREMIUM
 }
 
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    Int // <--- Changed from String to Int to match User.id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String? // "ios" | "android"
+  createdAt DateTime @default(now())
+}
+
 model User {
-  id              Int      @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   name            String
-  email           String   @unique
-  phone           String   @unique
+  email           String         @unique
+  phone           String         @unique
   password        String
-  role            Role     @default(CLIENT)
-  isPhoneVerified Boolean  @default(false) 
-  jobs            Job[]    @relation("ClientJobs")
-  reviewsWritten  Review[] @relation("ClientReviews")
-  notifications Notification[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  role            Role           @default(CLIENT)
+  pushToken       String?
+  deviceTokens    DeviceToken[]
+  isPhoneVerified Boolean        @default(false)
+  jobs            Job[]          @relation("ClientJobs")
+  reviewsWritten  Review[]       @relation("ClientReviews")
+  notifications   Notification[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model Category {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  iconName  String
-  isActive  Boolean   @default(true)
-  services  Service[] @relation("CategoryToServices")
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  iconName String
+  isActive Boolean   @default(true)
+  services Service[] @relation("CategoryToServices")
 }
 
 model Service {
@@ -79,33 +90,33 @@ model Service {
   isActive    Boolean   @default(true)
   jobs        Job[]     @relation("ServiceJobs")
 
-  categoryId  Int
-  category    Category  @relation("CategoryToServices", fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int
+  category   Category @relation("CategoryToServices", fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
 model Job {
-  id          Int        @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
   description String
   budget      Int
-  status      JobStatus  @default(PENDING)
+  status      JobStatus @default(PENDING)
   latitude    Float?
   longitude   Float?
   address     String?
   imageUrl    String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  clientId    Int
-  client      User       @relation("ClientJobs", fields: [clientId], references: [id])
+  clientId Int
+  client   User @relation("ClientJobs", fields: [clientId], references: [id])
 
-  serviceId   Int
-  service     Service    @relation("ServiceJobs", fields: [serviceId], references: [id])
-  
-  matches     JobMatch[]
-  bids        Bid[]      @relation("JobToBids")
-  review      Review?    @relation("JobToReview")
-  chatRoom     ChatRoom?
+  serviceId Int
+  service   Service @relation("ServiceJobs", fields: [serviceId], references: [id])
+
+  matches  JobMatch[]
+  bids     Bid[]      @relation("JobToBids")
+  review   Review?    @relation("JobToReview")
+  chatRoom ChatRoom?
 
   @@index([status])
   @@index([clientId])
@@ -117,25 +128,25 @@ model Technician {
   phone              String             @unique
   skillCategory      String
   city               String
-  cnicNumber         String?            @unique 
+  cnicNumber         String?            @unique
   cnicImageUrl       String?
-  selfieImageUrl     String?            
-  verificationStatus VerificationStatus @default(UNVERIFIED) 
+  selfieImageUrl     String?
+  verificationStatus VerificationStatus @default(UNVERIFIED)
   isVerified         Boolean            @default(false)
   whatsappGroupName  String?
 
-  latitude           Float?
-  longitude          Float?
-  
-  tier               TechTier           @default(FREE)
-  isWorking          Boolean            @default(false)
-  
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  
-  matches           JobMatch[]
-  bids              Bid[]              @relation("TechnicianToBids")
-  reviewsReceived   Review[]           @relation("TechnicianReviews")
+  latitude  Float?
+  longitude Float?
+
+  tier      TechTier @default(FREE)
+  isWorking Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  matches         JobMatch[]
+  bids            Bid[]      @relation("TechnicianToBids")
+  reviewsReceived Review[]   @relation("TechnicianReviews")
 
   @@index([latitude, longitude])
 }
@@ -148,73 +159,74 @@ model JobMatch {
   status           JobMatchStatus @default(PENDING)
   createdAt        DateTime       @default(now())
 
-  jobId            Int
-  job              Job            @relation(fields: [jobId], references: [id])
+  jobId Int
+  job   Job @relation(fields: [jobId], references: [id])
 
-  technicianId     Int
-  technician       Technician     @relation(fields: [technicianId], references: [id])
+  technicianId Int
+  technician   Technician @relation(fields: [technicianId], references: [id])
 }
 
 model Bid {
-  id           Int        @id @default(autoincrement())
-  amount       Int
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id        Int      @id @default(autoincrement())
+  amount    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  jobId        Int
-  job          Job        @relation("JobToBids", fields: [jobId], references: [id], onDelete: Cascade)
+  jobId Int
+  job   Job @relation("JobToBids", fields: [jobId], references: [id], onDelete: Cascade)
 
   technicianId Int
   technician   Technician @relation("TechnicianToBids", fields: [technicianId], references: [id], onDelete: Cascade)
+
   @@unique([jobId, technicianId])
 }
 
 //  Cohesive Trust Review Loop
 model Review {
-  id           Int        @id @default(autoincrement())
-  rating       Int        
-  comment      String?
-  createdAt    DateTime   @default(now())
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
 
-  jobId        Int        @unique
-  job          Job        @relation("JobToReview", fields: [jobId], references: [id], onDelete: Cascade)
+  jobId Int @unique
+  job   Job @relation("JobToReview", fields: [jobId], references: [id], onDelete: Cascade)
 
-  clientId     Int
-  client       User       @relation("ClientReviews", fields: [clientId], references: [id])
+  clientId Int
+  client   User @relation("ClientReviews", fields: [clientId], references: [id])
 
   technicianId Int
   technician   Technician @relation("TechnicianReviews", fields: [technicianId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
-  id          Int      @id @default(autoincrement())
-  userId      Int      
-  title       String
-  message     String
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ChatRoom {
-  id           Int       @id @default(autoincrement())
-  jobId        Int       @unique
-  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  messages     Message[]
+  id        Int       @id @default(autoincrement())
+  jobId     Int       @unique
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
 
   @@index([jobId])
 }
 
 model Message {
-  id         Int      @id @default(autoincrement())
-  roomId     Int
-  room       ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  senderId   Int      // Matches User.id (Client or Technician)
-  text       String
-  isRead     Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  roomId    Int
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId  Int // Matches User.id (Client or Technician)
+  text      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@index([roomId])
   @@index([senderId])

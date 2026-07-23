@@ -254,3 +254,43 @@ export const login = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
+
+
+// POST /api/auth/push-token
+export const updatePushToken = async (req, res, next) => {
+  try {
+    const { pushToken, platform } = req.body; 
+    const userId = req.user.id; 
+
+    if (!pushToken) {
+      return res.status(400).json({ message: "pushToken is required." });
+    }
+
+    // 1. Store/Upsert multi-device token mapping
+    await prisma.deviceToken.upsert({
+      where: { token: pushToken },
+      update: { 
+        userId, 
+        platform: platform || null 
+      },
+      create: {
+        userId,
+        token: pushToken,
+        platform: platform || null,
+      },
+    });
+
+    // 2. Keep user.pushToken updated as a convenient primary fallback
+    await prisma.user.update({
+      where: { id: userId },
+      data: { pushToken },
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Device push token registered successfully." 
+    });
+  } catch (error) {
+    next(error);
+  }
+};
